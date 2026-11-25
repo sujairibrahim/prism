@@ -10,7 +10,7 @@ The page includes:
 - Affected features
 - A risk meter from 1 to 10
 - A suggested review path
-- Conflicts with other open PRs
+- Real conflict check against the base branch and other open PRs: real conflicts and clean overlaps are shown apart
 - A Mermaid PR map — click a module to see its files
 - Auto-generated files, shown muted on the map
 - Light and dark mode
@@ -20,6 +20,8 @@ The page includes:
 ## Install
 
 You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in.
+
+For the real conflict check, run `/prism` inside a full (not shallow) local clone of the PR's repo, with git 2.38 or newer. PRism fetches PR heads into private `refs/prism/*` refs, runs `git merge-tree`, and deletes those refs again. It never checks out a branch or touches your working tree. Anywhere else, it falls back to file overlap only and says so on the page.
 
 Copy these two files into your Claude Code skills folder:
 
@@ -69,7 +71,7 @@ The score starts at 1. PRism adds or subtracts points using only file paths and 
 | No tests changed (skipped for docs/config-only or under 20 lines) | +2 |
 | Tests changed but thin (under a quarter of the other real lines) | +1 |
 | Tests changed alongside sensitive code or a migration, and not thin | −1 |
-| Already conflicts with the base branch | +2 |
-| Otherwise, overlaps files with another open PR | +1 |
+| Real conflict with the base branch or another open PR (or GitHub says it already conflicts) | +2 |
+| Otherwise, only a clean overlap: another open PR touches the same files but merges cleanly | +1 |
 
 The score is capped at 10. The lowest score is 1, or 2 when sensitive code or a migration changed. Levels: 1-3 low, 4-6 medium, 7-10 high. The page lists each rule that scored, with its points.

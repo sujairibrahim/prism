@@ -30,11 +30,50 @@ Skim the diff so you can say what each module does. If the diff is huge (about 2
 
 ## 3. Conflict check
 
-- If the PR is **open**:
-  1. Run `gh pr list --base <baseRefName> --state open --json number,title,headRefName,files`.
-  2. Find other open PRs that touch the same files. Those are potential conflicts.
-  3. Also check `mergeable`. If it is `CONFLICTING`, say this PR already conflicts with the base branch.
-- If the PR is **merged** or **closed**: say conflicts are already resolved or no longer apply, and skip the overlap check.
+If the PR is **merged** or **closed**: say conflicts are already resolved or no longer apply, and skip this step.
+
+If the PR is **open**:
+
+1. Run `gh pr list --base <baseRefName> --state open --limit 100 --json number,title,headRefName,files,mergeable`. Drop this PR from the list.
+2. Find other open PRs that touch the same files. Call these the **sharing PRs**, and note the shared files for each.
+3. Decide if you can run a **real check**. All of these must be true:
+   - `gh repo view --json nameWithOwner -q .nameWithOwner` prints the PR's `OWNER/REPO` (ignore case). That means the current folder is a local clone of the PR's repo.
+   - `git version` is 2.38 or newer.
+   - `git rev-parse --is-shallow-repository` prints `false`.
+4. **Real check.** Never check out, never touch the working tree, and never change the user's branches. Use the remote whose URL contains `OWNER/REPO` in `git remote -v` (usually `origin`). Fetch the base and the PR heads into a private `refs/prism/` namespace, in one command (with no sharing PRs, fetch only the base and this PR):
+
+   ```bash
+   git fetch --no-tags --quiet --no-write-fetch-head <remote> \
+     +refs/heads/<baseRefName>:refs/prism/base \
+     +pull/<N>/head:refs/prism/pr-<N> \
+     +pull/<M>/head:refs/prism/pr-<M>   # one line per sharing PR
+   ```
+
+   Then run `git merge-tree`, once for this PR against the base, and once against each sharing PR:
+
+   ```bash
+   git merge-tree --write-tree --name-only --no-messages refs/prism/base refs/prism/pr-<N>
+   git merge-tree --write-tree --name-only --no-messages refs/prism/pr-<N> refs/prism/pr-<M>
+   ```
+
+   Read each result:
+   - **Exit 0**: merges cleanly. The output is one line, a tree id.
+   - **Exit 1, and the first line is a 40-character tree id**: real conflict. The lines after the tree id are the conflicted files.
+   - **Anything else** (for example exit 1 with no tree id for a bad ref, or exit 128 for unrelated histories): the check failed for that pair. Treat that pair as file overlap only.
+
+   Classify each sharing PR:
+   - **Real conflict**: merge-tree reports conflicted files. Keep only files in that PR's shared files, because an out-of-date PR can also report its own conflicts with the base. If none are left, call it clean overlap. If the sharing PR's `mergeable` is `CONFLICTING`, add "PR M is also out of date with <base>".
+   - **Overlap, merges cleanly**: same files, no conflict.
+
+   Against the base: conflicted files mean this PR conflicts with the base branch. This replaces `mergeable`, which can be stale or `UNKNOWN`.
+
+   Last, always delete the private refs, even if something failed:
+
+   ```bash
+   git for-each-ref --format='%(refname)' refs/prism/ | while read -r r; do git update-ref -d "$r"; done
+   ```
+
+5. **Fallback.** If any check in item 3 is not true, or the fetch fails, use file overlap only: every sharing PR is a **potential conflict**, and `mergeable` = `CONFLICTING` means this PR conflicts with the base. Note the reason in one short phrase, for example "not run in a local clone of OWNER/REPO", "git is older than 2.38", "shallow clone", or "git fetch failed". The page must say it is file overlap only and why.
 
 ## 4. Group files, mute noise, classify
 
@@ -67,15 +106,15 @@ Split files into **real code** and **generated**.
    - no test files changed: +2
    - tests changed but thin (test lines are under a quarter of the other real lines): +1
    - tests changed alongside sensitive code or a migration, and not thin: −1
-7. **Conflicts**: +2 if `mergeable` is `CONFLICTING`; otherwise +1 if another open PR touches the same files.
+7. **Conflicts** (count once, use the highest): +2 for a real conflict with the base branch or another open PR (step 3), or if `mergeable` is `CONFLICTING`; otherwise +1 if another open PR only overlaps (same files, merges cleanly). In the fallback (file overlap only): +2 if `mergeable` is `CONFLICTING`, otherwise +1 if another open PR touches the same files.
 
 Then cap at 10. The lowest score is 1, or 2 if sensitive code or a migration changed. Level: 1-3 low, 4-6 medium, 7-10 high.
 
 Give one short reason per rule that scored, with its points, biggest first (for example `New JWT login flow +3`). Leave out rules that scored 0.
 
-**Review path 🧭** — pick the order a reviewer should read the modules, usually: data/schema → core logic → API → clients → tests/docs. Skip the generated node, branch nodes, and conflict nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
+**Review path 🧭** — pick the order a reviewer should read the modules, usually: data/schema → core logic → API → clients → tests/docs. Skip the generated node, branch nodes, conflict nodes, and overlap nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
 
-**Diagram** — prefer `flowchart TB` so the review path reads top to bottom. Use a subgraph for the path, in order. Keep labels short: `① emoji module +adds/-dels`. Use fewer edges and fewer crossings. If you cannot infer flow, link `HEAD` to the first review node and to side nodes only. Dashed conflict links: `AUTH -.-> C38`. After every module node (including generated), add `click ID call showNode("ID")`.
+**Diagram** — prefer `flowchart TB` so the review path reads top to bottom. Use a subgraph for the path, in order. Keep labels short: `① emoji module +adds/-dels`. Use fewer edges and fewer crossings. If you cannot infer flow, link `HEAD` to the first review node and to side nodes only. Other PRs: a real conflict is a node with class `conflict`, label `⚠️ PR 38 title`, linked `AUTH -.-> C38`. A clean overlap is a node with class `overlap`, label `🔀 PR 40 title`, linked without an arrowhead `USER -.- O40`. In the fallback, draw every sharing PR as `conflict`. Link each one from the module that holds the shared files. After every module node (including generated), add `click ID call showNode("ID")`.
 
 **Colors** — always include these `classDef` rules:
 
@@ -89,6 +128,7 @@ classDef deps fill:#581c87,stroke:#a855f7,color:#f3e8ff
 classDef risky fill:#9a3412,stroke:#f97316,color:#ffedd5
 classDef generated fill:#1f2937,stroke:#64748b,color:#94a3b8,stroke-dasharray:5 5
 classDef conflict fill:#7f1d1d,stroke:#ef4444,color:#fecaca,stroke-dasharray:5 5
+classDef overlap fill:#1c1917,stroke:#f59e0b,color:#fde68a,stroke-dasharray:3 3
 ```
 
 **Mermaid syntax rules** (or the diagram will fail): unique ids of letters and numbers only (never `end`); always quote labels; avoid `()`, `[]`, and `#` even inside quotes (write `PR 38`, not `PR #38`); paste raw Mermaid into the template, no fences.
@@ -111,12 +151,12 @@ If the repo is **not local**, do not search and do not guess callers. Infer affe
 
 ## 7. Copy this style
 
-Fake PR `#42` Add JWT login, `feature/jwt-login` → `main`, open, real code +201 / -6, total +281 / -6 because of one generated lockfile +80 / -0. Overlaps `src/api/auth.py` with open PR 38 Session refresh, but still mergeable. Risk 6/10 medium: new JWT login flow +3, adds a users migration +1, deps +1, overlap +1, tests cover the login −1 (55 test lines next to 152 other real lines, so not thin).
+Fake PR `#42` Add JWT login, `feature/jwt-login` → `main`, open, real code +201 / -6, total +281 / -6 because of one generated lockfile +80 / -0. Real check ran in a local clone: merges cleanly with `main`; real conflict with open PR 38 Session refresh in `src/api/auth.py`; open PR 40 Profile page also edits `src/services/user.py` but merges cleanly. Risk 7/10 high: new JWT login flow +3, adds a users migration +1, deps +1, real conflict +2, tests cover the login −1 (55 test lines next to 152 other real lines, so not thin).
 
 PR type: New feature.
 Before: The API had no JWT login, so users could not sign in with a token.
 After: Users can sign in with a JWT. A users migration stores the new login data, and the user service wires it in.
-Affected (pills, breaking first): Users database (breaking — adds a users migration); Auth API (may break — overlaps open PR 38 on auth.py); User service (changed).
+Affected (pills, breaking first): Users database (breaking — adds a users migration); Auth API (may break — conflicts with open PR 38 in auth.py); User service (changed).
 
 Review path: ① users migration → ② auth → ③ user service → ④ tests.
 
@@ -138,11 +178,13 @@ flowchart TB
   DEPS["📦 requirements.txt +2/-0"]
   GEN["🤖 auto-generated 1 file +80/-0"]
   C38["⚠️ PR 38 Session refresh"]
+  O40["🔀 PR 40 Profile page"]
 
   HEAD --> DB
   HEAD --> DEPS
   HEAD --> GEN
   AUTH -.-> C38
+  USER -.- O40
 
   click DB call showNode("DB")
   click AUTH call showNode("AUTH")
@@ -160,6 +202,7 @@ flowchart TB
   classDef risky fill:#9a3412,stroke:#f97316,color:#ffedd5
   classDef generated fill:#1f2937,stroke:#64748b,color:#94a3b8,stroke-dasharray:5 5
   classDef conflict fill:#7f1d1d,stroke:#ef4444,color:#fecaca,stroke-dasharray:5 5
+  classDef overlap fill:#1c1917,stroke:#f59e0b,color:#fde68a,stroke-dasharray:3 3
 
   class HEAD,BASE branch
   class DB,AUTH risky
@@ -168,6 +211,7 @@ flowchart TB
   class DEPS deps
   class GEN generated
   class C38 conflict
+  class O40 overlap
 
   linkStyle 1,2,3 stroke:#22d3ee,stroke-width:3px
 ```
@@ -223,7 +267,7 @@ flowchart TB
        <h2>Affected features</h2>
        <ul class="affected-list">
          <li><span class="feat-pill is-breaking" title="Adds a users migration">Users database</span></li>
-         <li><span class="feat-pill may-break" title="Overlaps open PR 38 on auth.py">Auth API</span></li>
+         <li><span class="feat-pill may-break" title="Conflicts with open PR 38 in auth.py">Auth API</span></li>
          <li><span class="feat-pill changed">User service</span></li>
        </ul>
      </div>
@@ -236,18 +280,54 @@ flowchart TB
      ```
 
    - `{{SUMMARY}}` — exactly three `<li>` bullets: what changed, why it matters, and any risk or conflict.
-   - `{{CONFLICTS}}` — overlaps in `<div class="conflicts-warn">...</div>`. Merged or closed: `<div class="conflicts-ok">This PR is already merged. Conflicts are resolved.</div>` (say "closed" when it is closed). Open with no overlap: `<div class="conflicts-ok">No conflicts found ✅</div>`.
+   - `{{CONFLICTS}}` — one box per kind, in this order, and skip empty kinds. End with one `conflicts-note` line that says how it was checked.
+     - `conflicts-real` — real conflicts, with the base branch first, then other PRs. List the conflicted files.
+     - `conflicts-overlap` — other PRs that edit the same files but merge cleanly.
+     - `conflicts-ok` — the base check passed, or nothing was found.
+
+     ```html
+     <div class="conflicts-real">
+       <p class="conflicts-head">⚠️ Real conflicts</p>
+       <ul>
+         <li><strong>PR 38 Session refresh</strong> conflicts in <code>src/api/auth.py</code></li>
+       </ul>
+     </div>
+     <div class="conflicts-overlap">
+       <p class="conflicts-head">🔀 Overlap, merges cleanly</p>
+       <ul>
+         <li><strong>PR 40 Profile page</strong> also edits <code>src/services/user.py</code></li>
+       </ul>
+     </div>
+     <div class="conflicts-ok">Merges cleanly with <code>main</code> ✅</div>
+     <p class="conflicts-note">Checked with <code>git merge-tree</code> against the latest <code>main</code> and open PR heads.</p>
+     ```
+
+     A base conflict goes first in `conflicts-real`: `<li><strong>main</strong> (base branch) conflicts in <code>src/app.py</code></li>`, and then drop the `conflicts-ok` box.
+
+     **Fallback** (file overlap only): put sharing PRs in `conflicts-warn` as potential conflicts, and say why in the note:
+
+     ```html
+     <div class="conflicts-warn">
+       <p class="conflicts-head">⚠️ Potential conflicts</p>
+       <ul>
+         <li><strong>PR 38 Session refresh</strong> also edits <code>src/api/auth.py</code></li>
+       </ul>
+     </div>
+     <p class="conflicts-note">File overlap only, not a real merge check: not run in a local clone of acme/api.</p>
+     ```
+
+     Open with nothing found: `<div class="conflicts-ok">No conflicts found ✅</div>` plus the note. Merged or closed: `<div class="conflicts-ok">This PR is already merged. Conflicts are resolved.</div>` (say "closed" when it is closed), with no note.
    - `{{RISK}}` — use this shape (level class is `low`, `medium`, or `high` on both `risk-level` and `risk-fill`; fill width is score times 10%):
 
      ```html
-     <div class="risk-meter" data-score="6" data-level="medium">
-       <div class="risk-head"><span class="risk-num">6</span><span class="risk-max">/10</span><span class="risk-level medium">Medium</span></div>
-       <div class="risk-bar"><div class="risk-fill medium" style="width:60%"></div></div>
+     <div class="risk-meter" data-score="7" data-level="high">
+       <div class="risk-head"><span class="risk-num">7</span><span class="risk-max">/10</span><span class="risk-level high">High</span></div>
+       <div class="risk-bar"><div class="risk-fill high" style="width:70%"></div></div>
        <ul class="risk-reasons">
          <li>New JWT login flow in auth +3</li>
+         <li>Real conflict with open PR 38 in auth.py +2</li>
          <li>Adds a users migration +1</li>
          <li>Updates requirements.txt +1</li>
-         <li>Overlaps open PR 38 on auth +1</li>
          <li>Tests cover the new login −1</li>
        </ul>
      </div>
@@ -268,7 +348,7 @@ Reply with only:
 
 1. One line: what the PR does.
 2. One line: main modules changed, with real-code +adds / -dels (and total if generated files were muted).
-3. One line: risk score and conflict status.
+3. One line: risk score and conflict status (real conflicts, clean overlaps, or "file overlap only" with the reason).
 4. A clickable link to the page, as a Markdown link with the absolute path, like `[🔺 Open PR #<N> map](file:///absolute/path/pr-<N>.html)`. Use the real absolute path of the file you wrote (use `pwd`). If it is the temporary copy, add: "Temporary view in `.prism/` (ignored by git). Run `/prism <N> save` to keep it in `prism-output/`." On the next line, also print the plain absolute path so it can be copied into any browser or editor preview. Then add one more line with a command the user can copy to open it, in a code block: `open <absolute path>` on macOS (`xdg-open` on Linux, `start` on Windows). Only show this command; never run it yourself.
 
 Do not paste the Mermaid or a long report in chat.

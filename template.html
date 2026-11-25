@@ -36,6 +36,12 @@
       --warn-border: rgba(251, 191, 36, 0.35);
       --ok-fg: #a7f3d0;
       --ok-border: rgba(52, 211, 153, 0.3);
+      --real-fg: #fecaca;
+      --real-bg: rgba(239, 68, 68, 0.12);
+      --real-border: rgba(239, 68, 68, 0.55);
+      --overlap-fg: #cbd5e1;
+      --overlap-bg: rgba(148, 163, 184, 0.07);
+      --overlap-border: rgba(245, 158, 11, 0.45);
       --surface: #0b1220;
       --stage-bg: #0a101c;
       --stage-dot: rgba(148, 163, 184, 0.12);
@@ -96,6 +102,12 @@
       --warn-border: rgba(217, 119, 6, 0.35);
       --ok-fg: #065f46;
       --ok-border: rgba(5, 150, 105, 0.3);
+      --real-fg: #991b1b;
+      --real-bg: rgba(239, 68, 68, 0.08);
+      --real-border: rgba(220, 38, 38, 0.45);
+      --overlap-fg: #334155;
+      --overlap-bg: rgba(100, 116, 139, 0.06);
+      --overlap-border: rgba(217, 119, 6, 0.5);
       --surface: #ffffff;
       --stage-bg: #e8edf5;
       --stage-dot: rgba(15, 23, 42, 0.1);
@@ -157,6 +169,12 @@
         --warn-border: rgba(217, 119, 6, 0.35);
         --ok-fg: #065f46;
         --ok-border: rgba(5, 150, 105, 0.3);
+        --real-fg: #991b1b;
+        --real-bg: rgba(239, 68, 68, 0.08);
+        --real-border: rgba(220, 38, 38, 0.45);
+        --overlap-fg: #334155;
+        --overlap-bg: rgba(100, 116, 139, 0.06);
+        --overlap-border: rgba(217, 119, 6, 0.5);
         --surface: #ffffff;
         --stage-bg: #e8edf5;
         --stage-dot: rgba(15, 23, 42, 0.1);
@@ -433,11 +451,25 @@
     .conflicts-card { padding: 0; overflow: hidden; }
     .conflicts-card h2 { padding: 20px 22px 0; }
 
+    .conflicts-real,
+    .conflicts-overlap,
     .conflicts-warn,
     .conflicts-ok {
       margin: 0 12px 12px;
       padding: 14px 16px;
       border-radius: 12px;
+    }
+
+    .conflicts-real {
+      background: var(--real-bg);
+      border: 1px solid var(--real-border);
+      color: var(--real-fg);
+    }
+
+    .conflicts-overlap {
+      background: var(--overlap-bg);
+      border: 1px dashed var(--overlap-border);
+      color: var(--overlap-fg);
     }
 
     .conflicts-warn {
@@ -452,8 +484,17 @@
       color: var(--ok-fg);
     }
 
+    .conflicts-real ul,
+    .conflicts-overlap ul,
     .conflicts-warn ul,
     .conflicts-ok ul { margin: 8px 0 0; padding-left: 18px; }
+    .conflicts-head { margin: 0; font-weight: 600; }
+    .conflicts-note {
+      margin: 0 12px 12px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
 
     .risk-meter { display: flex; flex-direction: column; gap: 12px; }
     .risk-head { display: flex; align-items: baseline; gap: 6px; }
@@ -680,6 +721,12 @@
       outline: 1px dashed #ef4444;
       outline-offset: 2px;
     }
+    .swatch.overlap {
+      background: #1c1917;
+      border-color: #f59e0b;
+      outline: 1px dashed #f59e0b;
+      outline-offset: 2px;
+    }
     .swatch.path {
       width: 16px;
       height: 0;
@@ -782,6 +829,7 @@
         <li><span class="swatch risky"></span> 🔥 risky</li>
         <li><span class="swatch generated"></span> 🤖 auto-generated</li>
         <li><span class="swatch conflict"></span> ⚠️ conflict with another PR</li>
+        <li><span class="swatch overlap"></span> 🔀 overlap, merges cleanly</li>
         <li><span class="swatch path"></span> 🧭 review path</li>
       </ul>
     </section>
