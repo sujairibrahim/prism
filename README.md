@@ -15,17 +15,19 @@ The page includes:
 - Auto-generated files, shown muted on the map
 - Light and dark mode
 
+Counting lines, muting generated files, grouping modules, finding overlaps, and scoring risk are done by a small script, `prism_collect.py`. So the numbers are the same every run, and big PRs stay fast. Claude reads the code and writes the words.
+
 ![Example PRism page for fake PR #42 Add JWT login](example-page.png)
 
 ## Install
 
-You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in.
+You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in, and Python 3 (standard library only).
 
-Copy these two files into your Claude Code skills folder:
+Copy these three files into your Claude Code skills folder:
 
 ```bash
 mkdir -p ~/.claude/skills/prism
-cp SKILL.md template.html ~/.claude/skills/prism/
+cp SKILL.md template.html prism_collect.py ~/.claude/skills/prism/
 ```
 
 ## Usage
@@ -47,3 +49,15 @@ Examples:
 By default, the page is written to `./.prism/pr-<N>.html` and kept out of git. Add `save` to write it to `./prism-output/` instead.
 
 Open the page in a browser, or copy the `open` command from the chat reply.
+
+## The collector script
+
+You can also run the script on its own. It prints one JSON object with the PR details, every file and its flags, the map modules, totals, tests, overlaps with other open PRs, and the risk score with reasons:
+
+```bash
+python3 ~/.claude/skills/prism/prism_collect.py 42
+python3 ~/.claude/skills/prism/prism_collect.py https://github.com/OWNER/REPO/pull/42
+python3 ~/.claude/skills/prism/prism_collect.py 42 --repo OWNER/REPO
+```
+
+Options: `--save FILE` writes the full JSON to a file and prints a shorter view, `--no-overlaps` skips the open-PR check, and `--max-nodes N` changes the map size (default 10). If `gh` is missing or not logged in, it prints an error JSON and exits with code 2 or 3.
