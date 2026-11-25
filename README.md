@@ -19,6 +19,8 @@ The page includes:
 - Light and dark mode
 - Optional: a Markdown comment posted on the PR, so the whole team sees the same map
 
+It can also rank every open PR waiting on your review, so you know which one to open first.
+
 ![Example PRism page for fake PR #42 Add JWT login](example-page.png)
 
 ## Install
@@ -67,6 +69,19 @@ Open the page in a browser, or copy the `open` command from the chat reply.
 The page loads Mermaid (for the PR map) and its fonts from a CDN, so it needs an internet connection. Offline, the PR map shows a short message instead, and the rest of the page still works: the summary, risk meter, review path, and a list of modules you can click to see their files. Fonts fall back to your system fonts.
 
 For the best "Affected features" check, run `/prism` from a local clone of the PR's repo. Otherwise PRism cannot search for callers, so it reads affected features from the diff only and says so on the page.
+
+### Review queue
+
+```text
+/prism queue
+/prism queue all
+```
+
+`/prism queue` ranks the open PRs in the current repo that are waiting on your review (including review requests to your teams). `/prism queue all` does the same across every repo.
+
+Each PR gets a quick risk score from its file paths and line counts. No diffs are read, so it stays fast. Shared files between PRs in the queue count as a conflict risk. The page shows the score, title, repo, author, age, size, a draft badge, the top reasons, and a `/prism` command to copy for a deep dive.
+
+The page is written to `./.prism/queue.html`. With more than 15 PRs across all repos, PRs are scored on size alone.
 
 ## How the risk score works
 

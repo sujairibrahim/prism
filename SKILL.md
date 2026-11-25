@@ -1,7 +1,7 @@
 ---
 name: prism
-description: Use when the user runs /prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch.
-argument-hint: [<PR number or URL> [since [sha]] [comment [post]] | branch [base=<name>] [+uncommitted]] [save]
+description: Use when the user runs /prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch. Also use for /prism queue, or when the user asks which PRs are waiting on their review.
+argument-hint: [<PR number or URL> [since [sha]] [comment [post]] | branch [base=<name>] [+uncommitted] | queue [all]] [save]
 ---
 
 # PRism 🔺
@@ -11,6 +11,8 @@ Show a clear flowchart of a GitHub pull request, or of your own branch before a 
 There are two modes:
 - **PR mode** — a PR already exists. This is the normal flow.
 - **Author mode** — you are on your own branch and there is no open PR yet. Same page, plus a suggested PR description.
+
+**Review queue:** if the input starts with `queue` (for example `/prism queue` or `/prism queue all`), skip steps 1-12 and follow **Review queue** at the end of this file instead.
 
 ## 1. Parse the input
 
@@ -591,3 +593,144 @@ On yes:
 
 5. If the update fails (for example 403 or 404), fall back to item 4 once. Do not retry more.
 6. Reply with one line: "Updated" or "Posted" plus the comment link (both commands print it).
+
+---
+
+# Review queue
+
+`/prism queue` ranks every open PR waiting on your review, so you know which one to open first. It is a quick score from file paths and line counts. Do not read any diffs here; that is what `/prism <N>` is for.
+
+## Q1. Pick the scope
+
+- `/prism queue` — the current repo. Get its name with `gh repo view --json nameWithOwner -q .nameWithOwner`.
+- `/prism queue all` — every repo you can see.
+- First run `gh auth status`. If it fails, stop and tell the user to run `gh auth login`.
+- Run `date -u +%Y-%m-%dT%H:%M:%SZ` once. Use it as "now" for ages.
+
+## Q2. Fetch the queue
+
+`review-requested:@me` already includes PRs where a team you are on was asked to review. Nothing extra is needed for teams.
+
+**Current repo** — one call gives everything:
+
+```bash
+gh pr list --search "review-requested:@me" --state open --limit 50 --json number,title,author,url,additions,deletions,files,createdAt,isDraft,headRefName,baseRefName,mergeable
+```
+
+**All repos** — `gh search prs` has no size, file, branch, or `mergeable` fields, so it takes two steps:
+
+1. List the PRs:
+
+   ```bash
+   gh search prs --review-requested=@me --state=open --archived=false --limit 50 --json number,title,author,url,createdAt,isDraft,repository
+   ```
+
+   The repo is `repository.nameWithOwner`.
+2. If there are **15 or fewer** PRs, fetch each one's files:
+
+   ```bash
+   gh pr view <N> --repo <OWNER/REPO> --json additions,deletions,files,headRefName,baseRefName,mergeable
+   ```
+
+3. If there are **more than 15**, do not fetch files. Get sizes for all of them in one call, and match rows by `url`:
+
+   ```bash
+   gh api graphql -f q='is:pr is:open review-requested:@me archived:false' -f query='query($q:String!){search(query:$q,type:ISSUE,first:50){nodes{... on PullRequest{url additions deletions changedFiles mergeable}}}}'
+   ```
+
+   Score these on size and `mergeable` only. Say so in `{{NOTE}}`: `Scored on size alone (more than 15 PRs). Run /prism on a PR for a full score.`
+
+If a list returns exactly 50 PRs, add to `{{NOTE}}`: `Showing the first 50 PRs.`
+
+## Q3. Score each PR
+
+Use the step 6 rubric, but only with file paths and line counts. Start at 1, add or subtract points, cap at 10. Level: 1-3 low, 4-6 medium, 7-10 high.
+
+1. Split files into real and generated, using the step 5 rules. Real size = additions and deletions of real files only.
+2. Add points with the step 6 rubric, using only paths and line counts (no diff, so never award the "new login, token, or permission flow" +3 on its own). Match folder or file names, case-insensitive:
+   - Sensitive code (`auth`, `login`, `session`, `token`, `oauth`, `permission`, `rbac`, `acl`, `security`, `crypto`, `payment`, `billing`): by lines changed in those files, under 50 = +1, 50-199 = +2, 200+ = +3.
+   - Migrations or schema (`migrations/`, `migrate`, `alembic/`, `*.sql`, `schema.prisma`; not generated snapshots): +1. You cannot tell add-only from changes without the diff, so never give +2 here.
+   - Config or CI (`.github/workflows/`, `.gitlab-ci.yml`, `Dockerfile`, `config/`, `.env*`, `*.yml`, `*.yaml`, `*.toml`, `*.ini`): +1
+   - Dependency manifests (`package.json`, `requirements*.txt`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile`, `pom.xml`, `build.gradle`): +1
+   - Size of real code (adds + dels): 300-999 = +1, 1000-2999 = +2, 3000+ = +3.
+   - Tests (`test`, `tests/`, `spec`, `__tests__/`, `*_test.*`, `*.test.*`), skipped for docs/config-only PRs and under 20 lines: +2 if no test files; +1 if test lines are under a quarter of the other real lines; −1 if tests changed alongside sensitive code or a migration and are not thin.
+   - Conflicts (count once): +2 if `mergeable` is `CONFLICTING`; otherwise +1 if the PR shares a real file path with another PR in this queue (same repo). This is file overlap only; `/prism <N>` runs the real check.
+   - The lowest score is 1, or 2 if sensitive code or a migration changed.
+3. Keep the top 1-2 reasons, biggest points first. Make them short and concrete, for example `Touches auth: src/api/auth.py`, `Shares src/api/auth.py with #38`, `No tests`, `Large: +1,820 real lines`, `Conflicts with main`.
+4. Age from `createdAt` to now: under 1 day `today`, under 14 days `N days`, under 9 weeks `N weeks`, else `N months`. Use `1 day`, not `1 days`.
+5. Rank: ready PRs first, highest score first; ties go to the older PR. Drafts go last, in the same order.
+
+## Q4. Write the queue page
+
+1. Read `queue-template.html` from the skill folder, usually `~/.claude/skills/prism/queue-template.html`.
+2. Replace these placeholders exactly:
+   - `{{TITLE}}` — `Review queue · owner/repo`, or `Review queue · all repos`. It appears twice (tab title and heading).
+   - `{{META}}` — HTML chips:
+
+     ```html
+     <span class="chip">owner/repo</span>
+     <span class="chip">5 waiting</span>
+     <span class="chip chip-high">2 high risk</span>
+     <span class="chip chip-muted">oldest 12 days</span>
+     <span class="chip chip-muted">checked 2026-11-25 14:02 UTC</span>
+     ```
+
+     Use `all repos` as the first chip for `/prism queue all`. Leave out the high-risk chip when it is 0.
+   - `{{NOTE}}` — the notes from Q2 as plain text. If there are none, replace it with nothing (the box hides itself).
+   - `{{QUEUE}}` — the ranked list. One `<li>` per PR, in rank order:
+
+     ```html
+     <ol class="queue-list">
+       <li class="queue-item">
+         <span class="rank">1</span>
+         <div class="q-score">
+           <div class="q-score-head"><span class="q-num">9</span><span class="q-max">/10</span><span class="risk-level high">High</span></div>
+           <div class="risk-bar"><div class="risk-fill high" style="width:90%"></div></div>
+         </div>
+         <div class="q-main">
+           <a class="q-title" href="https://github.com/owner/repo/pull/42">#42 Add JWT login</a>
+           <div class="q-meta">
+             <span class="chip">owner/repo</span>
+             <span class="chip">by alice</span>
+             <span class="chip">3 days</span>
+             <span class="chip">+201 / -6</span>
+           </div>
+           <ul class="q-reasons">
+             <li>Touches auth: src/api/auth.py</li>
+             <li>Shares src/api/auth.py with #38</li>
+           </ul>
+         </div>
+         <button type="button" class="copy-cmd" data-cmd="/prism 42"><code>/prism 42</code><span class="copy-label">Copy</span></button>
+       </li>
+     </ol>
+     ```
+
+     - Level class is `low`, `medium`, or `high` on both `risk-level` and `risk-fill`. Fill width is score times 10%.
+     - Size chip shows real code. If generated files were muted, add `<span class="chip chip-muted">total +A / -B</span>`. In size-only mode, show the total with no label.
+     - Draft: add `is-draft` to the `<li>` class and `<span class="chip chip-draft">Draft</span>` at the end of `q-meta`.
+     - Copy command: `/prism <N>` for `/prism queue`. For `/prism queue all`, use the PR URL, `/prism https://github.com/OWNER/REPO/pull/N`, because a bare number only works inside its own repo. Put the same text in `data-cmd` and `<code>`.
+     - Escape `<`, `>`, and `&` in titles.
+   - **Empty queue** — replace `{{QUEUE}}` with this, and use `0 waiting` in `{{META}}`:
+
+     ```html
+     <div class="queue-empty">
+       <div class="queue-empty-mark">☕</div>
+       <h2>Nothing waiting on you</h2>
+       <p>No open pull requests are asking for your review in owner/repo. Enjoy the quiet.</p>
+     </div>
+     ```
+
+     Say `in any repo` instead of `in owner/repo` for `/prism queue all`.
+   - Before writing, check that no `{{` text is left in the page.
+3. Write it to `./.prism/queue.html` (create the folder) and keep `.prism/` out of git the same way as step 9. Never edit `.gitignore`.
+4. Do NOT open the file or a browser yourself.
+
+## Q5. Reply in chat
+
+Reply with only:
+
+1. One line: how many PRs are waiting, and for which repo (or all repos).
+2. The top 3, one line each: `1. #42 Add JWT login (owner/repo) — 9/10 high: touches auth, shares auth.py with #38`. Fewer if there are fewer.
+3. The page link, the plain absolute path, and the `open` command in a code block, the same way as step 11. Then: `Run /prism <N> for a full deep dive.`
+
+If the queue is empty, reply with one line, `Nothing waiting on your review in owner/repo. ☕`, then the page link.
