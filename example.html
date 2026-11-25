@@ -290,6 +290,7 @@
     .chip-state.open { border-color: rgba(52, 211, 153, 0.45); color: var(--ok); background: var(--ok-bg); }
     .chip-state.merged { border-color: var(--merged-border); color: var(--merged-fg); background: var(--merged-bg); }
     .chip-state.closed { border-color: var(--closed-border); color: var(--closed-fg); background: var(--closed-bg); }
+    .chip-state.draft { border-color: var(--warn-border); color: var(--warn-fg); background: var(--warn-bg); }
 
     .brief-card {
       margin-bottom: 16px;
@@ -484,6 +485,49 @@
     }
     .review-steps strong { display: block; font-weight: 600; }
     .review-steps p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    .pr-desc-card { margin-bottom: 16px; }
+    .pr-desc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 6px;
+    }
+    .pr-desc-label { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .pr-desc-title,
+    .pr-desc-body {
+      margin: 0 0 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--stage-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .pr-desc-title { font-weight: 600; }
+    .pr-desc-body {
+      margin-bottom: 0;
+      max-height: 420px;
+      overflow: auto;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .copy-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
 
     .diagram-card { margin-bottom: 16px; padding: 20px 22px 16px; }
     .diagram-head {
@@ -745,6 +789,8 @@
 
     </section>
 
+    
+
     <section class="card diagram-card">
       <div class="diagram-head">
         <h2>PR map</h2>
@@ -837,6 +883,50 @@
   </div>
 
   <script type="application/json" id="prism-files">{"DB": {"label": "users migration", "files": [{"path": "db/users_migration.sql", "add": 40, "del": 0, "status": "risky", "generated": false}]}, "AUTH": {"label": "auth", "files": [{"path": "src/api/auth.py", "add": 80, "del": 0, "status": "risky", "generated": false}]}, "USER": {"label": "user service", "files": [{"path": "src/services/user.py", "add": 24, "del": 6, "status": "modified", "generated": false}]}, "TEST": {"label": "test_auth", "files": [{"path": "tests/test_auth.py", "add": 55, "del": 0, "status": "tests", "generated": false}]}, "DEPS": {"label": "requirements.txt", "files": [{"path": "requirements.txt", "add": 2, "del": 0, "status": "deps", "generated": false}]}, "GEN": {"label": "auto-generated", "files": [{"path": "poetry.lock", "add": 80, "del": 0, "status": "generated", "generated": true}]}}</script>
+  <script>
+    (function () {
+      function selectText(el) {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      function flash(btn, text) {
+        if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+        btn.textContent = text;
+        clearTimeout(btn._prismTimer);
+        btn._prismTimer = setTimeout(function () { btn.textContent = btn.dataset.label; }, 2000);
+      }
+      function fallbackCopy(btn, el) {
+        selectText(el);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        if (ok) {
+          window.getSelection().removeAllRanges();
+          flash(btn, "Copied");
+        } else {
+          var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+          flash(btn, mac ? "Press ⌘C" : "Press Ctrl+C");
+        }
+      }
+      document.addEventListener("click", function (event) {
+        var btn = event.target.closest && event.target.closest("[data-copy]");
+        if (!btn) return;
+        var el = document.getElementById(btn.getAttribute("data-copy"));
+        if (!el) return;
+        var text = el.textContent;
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(
+            function () { flash(btn, "Copied"); },
+            function () { fallbackCopy(btn, el); }
+          );
+        } else {
+          fallbackCopy(btn, el);
+        }
+      });
+    })();
+  </script>
   <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
 
