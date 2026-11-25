@@ -6,25 +6,35 @@ See what a pull request does at a glance. PRism turns a GitHub PR, or your own b
 
 ## Install
 
-You need [Claude Code](https://claude.com/claude-code), the [GitHub CLI](https://cli.github.com/) (`gh`, logged in), and Python 3.
+You need [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex), the [GitHub CLI](https://cli.github.com/) (`gh`, logged in), and Python 3.
+
+For Claude Code:
 
 ```bash
 git clone https://github.com/sujairibrahim/prism ~/.claude/skills/prism
 ```
 
-To update later, run `git -C ~/.claude/skills/prism pull`.
+For Codex:
+
+```bash
+git clone https://github.com/sujairibrahim/prism ~/.agents/skills/prism
+```
+
+To update later, run `git pull` in that folder.
 
 ## Use it
 
-| Type this in Claude Code | What you get |
+| Type this | What you get |
 | --- | --- |
 | `/prism 42` | A map of PR 42. A PR link works too. |
 | `/prism` | A map of your current branch, before you open a PR, with a suggested PR description. |
 | `/prism 42 since` | Only what changed since your last review. |
-| `/prism 42 comment` | The map posted as a comment on the PR, so your team sees it. Claude asks before posting. |
+| `/prism 42 comment` | The map posted as a comment on the PR, so your team sees it. It asks before posting. |
 | `/prism queue` | The PRs waiting on your review, riskiest first. |
 
-Claude replies with a link to the page. Pages go to a hidden `.prism/` folder that git ignores. Add `save` to any command to keep the page in `prism-output/` instead.
+In Codex, type `$prism` instead of `/prism`, or just ask, for example "map PR 42 with prism".
+
+You get a reply with a link to the page. Pages go to a hidden `.prism/` folder that git ignores. Add `save` to any command to keep the page in `prism-output/` instead.
 
 ## What's on the page
 
@@ -76,12 +86,12 @@ The score starts at 1. "Lines" means lines changed, not counting generated files
 
 The score is capped at 10. It is at least 2 when sensitive code or a migration changed. 1-3 is low, 4-6 medium, 7-10 high.
 
-A small script, `prism_collect.py`, does all the counting and scoring, so the numbers are the same every run. Claude reads the code and writes the words.
+A small script, `prism_collect.py`, does all the counting and scoring, so the numbers are the same every run. The AI reads the code and writes the words.
 
 </details>
 
 <details>
-<summary><strong>Post on every PR automatically (GitHub Actions)</strong></summary>
+<summary><strong>Post on every PR automatically (GitHub Actions, uses Claude Code)</strong></summary>
 
 [examples/github-action/prism.yml](examples/github-action/prism.yml) runs PRism on every opened or updated PR and posts or updates one PRism comment. See [examples/comment-example.md](examples/comment-example.md) for what the comment looks like.
 
@@ -106,12 +116,12 @@ The comment is posted by `github-actions[bot]`. PRs from forks are skipped. Each
 <details>
 <summary><strong>Run the script on its own</strong></summary>
 
-`prism_collect.py` prints the PR facts as JSON: files, modules, totals, tests, conflicts, and the risk score with reasons.
+Run it from the PRism folder. `prism_collect.py` prints the PR facts as JSON: files, modules, totals, tests, conflicts, and the risk score with reasons.
 
 ```bash
-python3 ~/.claude/skills/prism/prism_collect.py 42
-python3 ~/.claude/skills/prism/prism_collect.py 42 --since last
-python3 ~/.claude/skills/prism/prism_collect.py --branch
+python3 prism_collect.py 42
+python3 prism_collect.py 42 --since last
+python3 prism_collect.py --branch
 ```
 
 Run it with `--help` for all options.
