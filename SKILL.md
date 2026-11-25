@@ -307,10 +307,12 @@ If the user says no, do nothing more. Tell them the draft stays at the path abov
 On yes:
 
 1. Get the repo: use `OWNER/REPO` from the URL, or run `gh repo view --json nameWithOwner -q .nameWithOwner`.
-2. Look for an existing PRism comment:
+2. Look for an existing PRism comment posted by this same account. Never edit a comment someone else wrote, even if it has the marker.
+   - Get your login with `gh api user --jq .login`. If that fails (it does in GitHub Actions), use `github-actions[bot]`.
+   - Then run, with that login in place of `LOGIN`:
 
    ```bash
-   gh api repos/OWNER/REPO/issues/<N>/comments --paginate --jq '.[] | select(.body | startswith("<!-- prism -->")) | .id'
+   gh api repos/OWNER/REPO/issues/<N>/comments --paginate --jq '.[] | select(.user.login == "LOGIN") | select(.body | startswith("<!-- prism -->")) | .id'
    ```
 
 3. If it prints an id, update that comment (use the first id if there are several):
