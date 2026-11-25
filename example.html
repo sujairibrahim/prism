@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>#42 Add JWT login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070b14;
+      --card: rgba(16, 24, 39, 0.78);
+      --border: rgba(148, 163, 184, 0.16);
+      --text: #e8eef8;
+      --muted: #8b9bb4;
+      --accent: #22d3ee;
+      --accent-2: #818cf8;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --high: #f97316;
+      --warn-bg: rgba(251, 191, 36, 0.1);
+      --ok-bg: rgba(52, 211, 153, 0.1);
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+      --chip-bg: rgba(15, 23, 42, 0.8);
+      --merged-fg: #c7d2fe;
+      --merged-bg: rgba(129, 140, 248, 0.12);
+      --merged-border: rgba(129, 140, 248, 0.5);
+      --closed-fg: #fca5a5;
+      --closed-bg: rgba(248, 113, 113, 0.1);
+      --closed-border: rgba(248, 113, 113, 0.45);
+      --warn-fg: #fde68a;
+      --warn-border: rgba(251, 191, 36, 0.35);
+      --ok-fg: #a7f3d0;
+      --ok-border: rgba(52, 211, 153, 0.3);
+      --surface: #0b1220;
+      --stage-bg: #0a101c;
+      --stage-dot: rgba(148, 163, 184, 0.12);
+      --blob-1: #1d4ed8;
+      --blob-2: #0f766e;
+      --blob-opacity: 0.28;
+      --mark-fg: #041018;
+      --mark-shadow: 0 0 24px rgba(34, 211, 238, 0.35);
+      --type-new-fg: #dcfce7;
+      --type-new-bg: #166534;
+      --type-improves-fg: #e0f2fe;
+      --type-improves-bg: #075985;
+      --type-fix-fg: #fffbeb;
+      --type-fix-bg: #b45309;
+      --type-removes-fg: #fff1f2;
+      --type-removes-bg: #b91c1c;
+      --type-refactor-fg: #f3e8ff;
+      --type-refactor-bg: #6b21a8;
+      --type-docs-fg: #e2e8f0;
+      --type-docs-bg: #334155;
+      --pill-changed-fg: #e0f2fe;
+      --pill-changed-bg: #0369a1;
+      --pill-may-break-fg: #fffbeb;
+      --pill-may-break-bg: #b45309;
+      --pill-safe-fg: #dcfce7;
+      --pill-safe-bg: #15803d;
+      --pill-breaking-fg: #fff1f2;
+      --pill-breaking-bg: #b91c1c;
+      --tooltip-bg: #0b1220;
+      --tooltip-fg: #f8fafc;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #f3f5f9;
+      --card: rgba(255, 255, 255, 0.9);
+      --border: rgba(15, 23, 42, 0.12);
+      --text: #0f172a;
+      --muted: #5b6b82;
+      --accent: #0e7490;
+      --accent-2: #4f46e5;
+      --ok: #059669;
+      --warn: #d97706;
+      --high: #ea580c;
+      --warn-bg: rgba(217, 119, 6, 0.12);
+      --ok-bg: rgba(5, 150, 105, 0.1);
+      --shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+      --chip-bg: #ffffff;
+      --merged-fg: #3730a3;
+      --merged-bg: rgba(99, 102, 241, 0.1);
+      --merged-border: rgba(99, 102, 241, 0.35);
+      --closed-fg: #b91c1c;
+      --closed-bg: rgba(248, 113, 113, 0.12);
+      --closed-border: rgba(220, 38, 38, 0.3);
+      --warn-fg: #92400e;
+      --warn-border: rgba(217, 119, 6, 0.35);
+      --ok-fg: #065f46;
+      --ok-border: rgba(5, 150, 105, 0.3);
+      --surface: #ffffff;
+      --stage-bg: #e8edf5;
+      --stage-dot: rgba(15, 23, 42, 0.1);
+      --blob-1: #93c5fd;
+      --blob-2: #99f6e4;
+      --blob-opacity: 0.42;
+      --mark-fg: #041018;
+      --mark-shadow: 0 0 16px rgba(14, 116, 144, 0.25);
+      --type-new-fg: #14532d;
+      --type-new-bg: #86efac;
+      --type-improves-fg: #0c4a6e;
+      --type-improves-bg: #7dd3fc;
+      --type-fix-fg: #78350f;
+      --type-fix-bg: #fbbf24;
+      --type-removes-fg: #7f1d1d;
+      --type-removes-bg: #fca5a5;
+      --type-refactor-fg: #581c87;
+      --type-refactor-bg: #d8b4fe;
+      --type-docs-fg: #1e293b;
+      --type-docs-bg: #cbd5e1;
+      --pill-changed-fg: #0c4a6e;
+      --pill-changed-bg: #7dd3fc;
+      --pill-may-break-fg: #78350f;
+      --pill-may-break-bg: #fbbf24;
+      --pill-safe-fg: #14532d;
+      --pill-safe-bg: #86efac;
+      --pill-breaking-fg: #7f1d1d;
+      --pill-breaking-bg: #fca5a5;
+      --tooltip-bg: #0f172a;
+      --tooltip-fg: #f8fafc;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f3f5f9;
+        --card: rgba(255, 255, 255, 0.9);
+        --border: rgba(15, 23, 42, 0.12);
+        --text: #0f172a;
+        --muted: #5b6b82;
+        --accent: #0e7490;
+        --accent-2: #4f46e5;
+        --ok: #059669;
+        --warn: #d97706;
+        --high: #ea580c;
+        --warn-bg: rgba(217, 119, 6, 0.12);
+        --ok-bg: rgba(5, 150, 105, 0.1);
+        --shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+        --chip-bg: #ffffff;
+        --merged-fg: #3730a3;
+        --merged-bg: rgba(99, 102, 241, 0.1);
+        --merged-border: rgba(99, 102, 241, 0.35);
+        --closed-fg: #b91c1c;
+        --closed-bg: rgba(248, 113, 113, 0.12);
+        --closed-border: rgba(220, 38, 38, 0.3);
+        --warn-fg: #92400e;
+        --warn-border: rgba(217, 119, 6, 0.35);
+        --ok-fg: #065f46;
+        --ok-border: rgba(5, 150, 105, 0.3);
+        --surface: #ffffff;
+        --stage-bg: #e8edf5;
+        --stage-dot: rgba(15, 23, 42, 0.1);
+        --blob-1: #93c5fd;
+        --blob-2: #99f6e4;
+        --blob-opacity: 0.42;
+        --mark-fg: #041018;
+        --mark-shadow: 0 0 16px rgba(14, 116, 144, 0.25);
+        --type-new-fg: #14532d;
+        --type-new-bg: #86efac;
+        --type-improves-fg: #0c4a6e;
+        --type-improves-bg: #7dd3fc;
+        --type-fix-fg: #78350f;
+        --type-fix-bg: #fbbf24;
+        --type-removes-fg: #7f1d1d;
+        --type-removes-bg: #fca5a5;
+        --type-refactor-fg: #581c87;
+        --type-refactor-bg: #d8b4fe;
+        --type-docs-fg: #1e293b;
+        --type-docs-bg: #cbd5e1;
+        --pill-changed-fg: #0c4a6e;
+        --pill-changed-bg: #7dd3fc;
+        --pill-may-break-fg: #78350f;
+        --pill-may-break-bg: #fbbf24;
+        --pill-safe-fg: #14532d;
+        --pill-safe-bg: #86efac;
+        --pill-breaking-fg: #7f1d1d;
+        --pill-breaking-bg: #fca5a5;
+        --tooltip-bg: #0f172a;
+        --tooltip-fg: #f8fafc;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Outfit", system-ui, sans-serif;
+      line-height: 1.5;
+    }
+
+    body { position: relative; overflow-x: hidden; }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      width: 480px;
+      height: 480px;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: var(--blob-opacity);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::before { top: -160px; left: -80px; background: var(--blob-1); }
+    body::after { right: -120px; top: 120px; background: var(--blob-2); }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 28px 24px 40px;
+    }
+
+    header.hero {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .theme-toggle {
+      appearance: none;
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .theme-toggle:hover { border-color: var(--accent); }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: var(--mark-fg);
+      box-shadow: var(--mark-shadow);
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(1.5rem, 3vw, 2.05rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }
+
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--chip-bg);
+      color: var(--text);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+    }
+
+    .chip-muted { color: var(--muted); }
+    .chip-state.open { border-color: rgba(52, 211, 153, 0.45); color: var(--ok); background: var(--ok-bg); }
+    .chip-state.merged { border-color: var(--merged-border); color: var(--merged-fg); background: var(--merged-bg); }
+    .chip-state.closed { border-color: var(--closed-border); color: var(--closed-fg); background: var(--closed-bg); }
+
+    .brief-card {
+      margin-bottom: 16px;
+      padding: 12px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .brief-card h2 { margin: 0; }
+
+    .pr-type-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .pr-type-badge.type-new { color: var(--type-new-fg); background: var(--type-new-bg); }
+    .pr-type-badge.type-improves { color: var(--type-improves-fg); background: var(--type-improves-bg); }
+    .pr-type-badge.type-fix { color: var(--type-fix-fg); background: var(--type-fix-bg); }
+    .pr-type-badge.type-removes { color: var(--type-removes-fg); background: var(--type-removes-bg); }
+    .pr-type-badge.type-refactor { color: var(--type-refactor-fg); background: var(--type-refactor-bg); }
+    .pr-type-badge.type-docs { color: var(--type-docs-fg); background: var(--type-docs-bg); }
+
+    .before-after { display: flex; flex-direction: column; gap: 2px; }
+    .before-after p { margin: 0; font-size: 14px; }
+    .before-after strong { color: var(--muted); font-weight: 600; }
+
+    .affected {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+    }
+    .affected-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .feat-pill {
+      display: inline-flex;
+      align-items: center;
+      position: relative;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+      cursor: default;
+    }
+    .feat-pill.changed { color: var(--pill-changed-fg); background: var(--pill-changed-bg); }
+    .feat-pill.may-break { color: var(--pill-may-break-fg); background: var(--pill-may-break-bg); }
+    .feat-pill.safe { color: var(--pill-safe-fg); background: var(--pill-safe-bg); }
+    .feat-pill.is-breaking { color: var(--pill-breaking-fg); background: var(--pill-breaking-bg); }
+    .feat-pill[title]:hover::after,
+    .feat-pill[title]:focus-visible::after {
+      content: attr(title);
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 6px);
+      z-index: 20;
+      max-width: 260px;
+      width: max-content;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: var(--tooltip-bg);
+      color: var(--tooltip-fg);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0;
+      line-height: 1.4;
+      white-space: normal;
+      pointer-events: none;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    }
+    .affected-empty { margin: 0; color: var(--muted); font-size: 13px; }
+
+
+    .grid-top {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr 0.9fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 980px) {
+      .grid-top { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .summary-card ul { margin: 0; padding-left: 18px; }
+    .summary-card li { margin: 0 0 8px; }
+    .summary-card li:last-child { margin-bottom: 0; }
+
+    .conflicts-card { padding: 0; overflow: hidden; }
+    .conflicts-card h2 { padding: 20px 22px 0; }
+
+    .conflicts-warn,
+    .conflicts-ok {
+      margin: 0 12px 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+    }
+
+    .conflicts-warn {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      color: var(--warn-fg);
+    }
+
+    .conflicts-ok {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok-border);
+      color: var(--ok-fg);
+    }
+
+    .conflicts-warn ul,
+    .conflicts-ok ul { margin: 8px 0 0; padding-left: 18px; }
+
+    .risk-meter { display: flex; flex-direction: column; gap: 12px; }
+    .risk-head { display: flex; align-items: baseline; gap: 6px; }
+    .risk-num { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+    .risk-max { color: var(--muted); font-size: 1.1rem; }
+    .risk-level {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .risk-level.low, .risk-fill.low { background: var(--ok); color: #04210f; }
+    .risk-level.medium, .risk-fill.medium { background: var(--warn); color: #3a2a00; }
+    .risk-level.high, .risk-fill.high { background: var(--high); color: #2a1000; }
+    .risk-level.low { color: #04210f; background: var(--ok); }
+    .risk-level.medium { color: #3a2a00; background: var(--warn); }
+    .risk-level.high { color: #2a1000; background: var(--high); }
+
+    .risk-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .risk-fill { height: 100%; border-radius: 999px; }
+    .risk-reasons { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+    .risk-reasons li { margin: 0 0 4px; }
+
+    .review-card { margin-bottom: 16px; }
+    .review-steps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px 16px;
+    }
+    .review-steps li { display: flex; gap: 10px; align-items: flex-start; }
+    .step-num {
+      flex: 0 0 auto;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .review-steps strong { display: block; font-weight: 600; }
+    .review-steps p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    .diagram-card { margin-bottom: 16px; padding: 20px 22px 16px; }
+    .diagram-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .diagram-head h2 { margin: 0; }
+    .diagram-hint { color: var(--muted); font-size: 12px; margin-right: auto; margin-left: 12px; }
+
+    .zoom-controls { display: flex; gap: 6px; }
+    .zoom-controls button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .zoom-controls button:hover { border-color: var(--accent); color: var(--accent); }
+
+    .diagram-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px) {
+      .diagram-wrap { grid-template-columns: 1fr; }
+    }
+
+    .diagram-stage {
+      overflow: auto;
+      min-height: 280px;
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 1px 1px, var(--stage-dot) 1px, transparent 0) 0 0 / 22px 22px,
+        var(--stage-bg);
+      border: 1px solid var(--border);
+    }
+
+    .diagram-inner {
+      transform-origin: top center;
+      padding: 20px 16px;
+      width: 100%;
+    }
+
+    .diagram-inner pre.mermaid { margin: 0; width: 100%; background: transparent; }
+    .diagram-inner pre.mermaid svg {
+      width: 100% !important;
+      max-width: none !important;
+      height: auto !important;
+    }
+    .diagram-inner .node { cursor: pointer; }
+    .diagram-inner .node.is-selected rect,
+    .diagram-inner .node.is-selected .basic.label-container {
+      stroke: var(--accent) !important;
+      stroke-width: 3px !important;
+    }
+
+    .file-panel {
+      border-radius: 14px;
+      background: var(--stage-bg);
+      border: 1px solid var(--border);
+      padding: 16px;
+      min-height: 280px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      position: sticky;
+      top: 16px;
+      align-self: start;
+    }
+    .file-panel h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .file-panel .panel-empty { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+    .file-list { list-style: none; margin: 12px 0 0; padding: 0; }
+    .file-list li {
+      display: grid;
+      grid-template-columns: 1.4em 1fr auto;
+      gap: 8px;
+      align-items: baseline;
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .file-list .path {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .file-list .pm {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .file-list li.is-generated { opacity: 0.7; color: var(--muted); }
+
+    .legend-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .legend-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      flex: 0 0 auto;
+    }
+    .swatch.branch { background: #1e293b; border-color: #94a3b8; }
+    .swatch.added { background: #14532d; border-color: #22c55e; }
+    .swatch.modified { background: #713f12; border-color: #eab308; }
+    .swatch.deleted { background: #7f1d1d; border-color: #ef4444; }
+    .swatch.tests { background: #1e3a8a; border-color: #3b82f6; }
+    .swatch.deps { background: #581c87; border-color: #a855f7; }
+    .swatch.risky { background: #9a3412; border-color: #f97316; }
+    .swatch.generated {
+      background: #1f2937;
+      border-color: #64748b;
+      outline: 1px dashed #64748b;
+      outline-offset: 2px;
+    }
+    .swatch.conflict {
+      background: #7f1d1d;
+      border-color: #ef4444;
+      outline: 1px dashed #ef4444;
+      outline-offset: 2px;
+    }
+    .swatch.path {
+      width: 16px;
+      height: 0;
+      border-radius: 0;
+      border: 0;
+      border-top: 3px solid #22d3ee;
+    }
+
+    footer {
+      margin-top: 22px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+  </style>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("prism-theme");
+        if (t !== "light" && t !== "dark") {
+          t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <div class="brand"><span class="mark" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm8.5 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM5 12.5A1.5 1.5 0 1 1 2 12.5a1.5 1.5 0 0 1 3 0ZM3.5 5v6.1c.15.07.29.16.44.26A2.99 2.99 0 0 1 6 10.5V8.75h5.25A2.75 2.75 0 0 1 14 6V5.12a1.5 1.5 0 1 0-1 0V6A1.75 1.75 0 0 0 11.25 7.75H6V5.5c.15-.07.3-.16.44-.26A2.99 2.99 0 0 0 8.5 3.5h.12a1.5 1.5 0 1 0 0-1H8.5A3.99 3.99 0 0 1 5 5.12V5Z"/></svg></span> PRism</div>
+        <h1>#42 Add JWT login</h1>
+        <div class="meta">
+     <span class="pr-type-badge type-new">New feature</span>
+     <span class="chip">acme/api</span>
+     <span class="chip">#42</span>
+     <span class="chip">by alice</span>
+     <span class="chip">🌿 feature/jwt-login → 🎯 main</span>
+     <span class="chip chip-state open">Open</span>
+     <span class="chip">real code +201 / -6</span>
+     <span class="chip chip-muted">total +281 / -6</span>
+</div>
+      </div>
+      <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch theme">☀️</button>
+    </header>
+
+    <section class="card brief-card">
+      <div class="before-after">
+        <p><strong>Before:</strong> The API had no JWT login, so users could not sign in with a token.</p>
+        <p><strong>After:</strong> Users can sign in with a JWT. A users migration stores the new login data, and the user service wires it in.</p>
+      </div>
+      <div class="affected">
+        <h2>Affected features</h2>
+        <ul class="affected-list">
+          <li><span class="feat-pill is-breaking" title="Adds a users migration">Users database</span></li>
+          <li><span class="feat-pill may-break" title="Overlaps open PR 38 on auth.py">Auth API</span></li>
+          <li><span class="feat-pill changed">User service</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="grid-top">
+      <section class="card summary-card">
+        <h2>Summary</h2>
+        <ul>
+          
+          <li>Adds JWT login in the auth API and a users migration, then wires it through the user service.</li>
+          <li>This is the path every signed-in request will use, so a mistake here can lock people out.</li>
+          <li>Watch the overlap with open PR 38, which also edits auth. A generated lockfile is muted on the map.</li>
+
+        </ul>
+      </section>
+      <section class="card risk-card">
+        <h2>Risk meter 🔥</h2>
+        
+        <div class="risk-meter" data-score="9" data-level="high">
+          <div class="risk-head"><span class="risk-num">9</span><span class="risk-max">/10</span><span class="risk-level high">High</span></div>
+          <div class="risk-bar"><div class="risk-fill high" style="width:90%"></div></div>
+          <ul class="risk-reasons">
+            <li>Touches auth and a new JWT login path</li>
+            <li>Adds a users migration</li>
+            <li>Updates requirements.txt</li>
+            <li>Overlaps open PR 38 on auth</li>
+          </ul>
+        </div>
+
+      </section>
+      <section class="card conflicts-card">
+        <h2>Conflicts</h2>
+        
+        <div class="conflicts-warn">
+          Potential conflict with <strong>PR 38 Session refresh</strong> on <code>src/api/auth.py</code>.
+          This PR is still mergeable with <code>main</code>.
+        </div>
+
+      </section>
+    </div>
+
+    <section class="card review-card">
+      <h2>Review path 🧭</h2>
+      
+      <ol class="review-steps">
+        <li><span class="step-num">①</span><div><strong>users migration</strong><p>New tables the login flow writes to.</p></div></li>
+        <li><span class="step-num">②</span><div><strong>auth</strong><p>JWT login is the new entry point, and it overlaps PR 38.</p></div></li>
+        <li><span class="step-num">③</span><div><strong>user service</strong><p>Wires login into the existing user logic.</p></div></li>
+        <li><span class="step-num">④</span><div><strong>tests</strong><p>Check that the new login path is covered.</p></div></li>
+      </ol>
+
+    </section>
+
+    <section class="card diagram-card">
+      <div class="diagram-head">
+        <h2>PR map</h2>
+        <p class="diagram-hint">Click a module to see its files</p>
+        <div class="zoom-controls">
+          <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+          <button type="button" id="zoom-reset" aria-label="Reset zoom">100%</button>
+          <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+        </div>
+      </div>
+      <div class="diagram-wrap">
+        <div class="diagram-stage" id="diagram-stage">
+          <div class="diagram-inner" id="diagram-inner">
+            <pre class="mermaid">flowchart TB
+  HEAD["🌿 feature/jwt-login"] --> BASE["🎯 main"]
+
+  subgraph PATH["Review path"]
+    direction TB
+    DB["① 🔥 users migration +40/-0"]
+    AUTH["② 🔥 auth +80/-0"]
+    USER["③ 🟡 user service +24/-6"]
+    TEST["④ 🧪 test_auth +55/-0"]
+    DB ==> AUTH
+    AUTH ==> USER
+    USER ==> TEST
+  end
+
+  DEPS["📦 requirements.txt +2/-0"]
+  GEN["🤖 auto-generated 1 file +80/-0"]
+  C38["⚠️ PR 38 Session refresh"]
+
+  HEAD --> DB
+  HEAD --> DEPS
+  HEAD --> GEN
+  AUTH -.-> C38
+
+  click DB call showNode("DB")
+  click AUTH call showNode("AUTH")
+  click USER call showNode("USER")
+  click TEST call showNode("TEST")
+  click DEPS call showNode("DEPS")
+  click GEN call showNode("GEN")
+
+  classDef branch fill:#1e293b,stroke:#94a3b8,color:#e2e8f0
+  classDef added fill:#14532d,stroke:#22c55e,color:#dcfce7
+  classDef modified fill:#713f12,stroke:#eab308,color:#fef9c3
+  classDef deleted fill:#7f1d1d,stroke:#ef4444,color:#fee2e2
+  classDef tests fill:#1e3a8a,stroke:#3b82f6,color:#dbeafe
+  classDef deps fill:#581c87,stroke:#a855f7,color:#f3e8ff
+  classDef risky fill:#9a3412,stroke:#f97316,color:#ffedd5
+  classDef generated fill:#1f2937,stroke:#64748b,color:#94a3b8,stroke-dasharray:5 5
+  classDef conflict fill:#7f1d1d,stroke:#ef4444,color:#fecaca,stroke-dasharray:5 5
+
+  class HEAD,BASE branch
+  class DB,AUTH risky
+  class USER modified
+  class TEST tests
+  class DEPS deps
+  class GEN generated
+  class C38 conflict
+
+  linkStyle 1,2,3 stroke:#22d3ee,stroke-width:3px</pre>
+          </div>
+        </div>
+        <aside class="file-panel" id="file-panel">
+          <h3 id="file-panel-title">Files</h3>
+          <p class="panel-empty" id="file-panel-empty">Click a module on the map to see its files.</p>
+          <ul class="file-list" id="file-panel-list" hidden></ul>
+        </aside>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Legend</h2>
+      <ul class="legend-list">
+        <li><span class="swatch branch"></span> 🌿 head branch → 🎯 base branch</li>
+        <li><span class="swatch added"></span> 🟢 added</li>
+        <li><span class="swatch modified"></span> 🟡 modified</li>
+        <li><span class="swatch deleted"></span> 🔴 deleted</li>
+        <li><span class="swatch tests"></span> 🧪 tests</li>
+        <li><span class="swatch deps"></span> 📦 dependencies</li>
+        <li><span class="swatch risky"></span> 🔥 risky</li>
+        <li><span class="swatch generated"></span> 🤖 auto-generated</li>
+        <li><span class="swatch conflict"></span> ⚠️ conflict with another PR</li>
+        <li><span class="swatch path"></span> 🧭 review path</li>
+      </ul>
+    </section>
+
+    <footer>Generated by PRism 🔺</footer>
+  </div>
+
+  <script type="application/json" id="prism-files">{"DB": {"label": "users migration", "files": [{"path": "db/users_migration.sql", "add": 40, "del": 0, "status": "risky", "generated": false}]}, "AUTH": {"label": "auth", "files": [{"path": "src/api/auth.py", "add": 80, "del": 0, "status": "risky", "generated": false}]}, "USER": {"label": "user service", "files": [{"path": "src/services/user.py", "add": 24, "del": 6, "status": "modified", "generated": false}]}, "TEST": {"label": "test_auth", "files": [{"path": "tests/test_auth.py", "add": 55, "del": 0, "status": "tests", "generated": false}]}, "DEPS": {"label": "requirements.txt", "files": [{"path": "requirements.txt", "add": 2, "del": 0, "status": "deps", "generated": false}]}, "GEN": {"label": "auto-generated", "files": [{"path": "poetry.lock", "add": 80, "del": 0, "status": "generated", "generated": true}]}}</script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+    const STATUS_EMOJI = {
+      added: "🟢",
+      modified: "🟡",
+      deleted: "🔴",
+      tests: "🧪",
+      deps: "📦",
+      risky: "🔥",
+      generated: "🤖"
+    };
+
+    let FILES = {};
+    try {
+      FILES = JSON.parse(document.getElementById("prism-files").textContent);
+    } catch (err) {
+      FILES = {};
+    }
+
+    const panelTitle = document.getElementById("file-panel-title");
+    const panelEmpty = document.getElementById("file-panel-empty");
+    const panelList = document.getElementById("file-panel-list");
+
+    function nodeKeyFromEl(el) {
+      const title = el.querySelector("title");
+      if (title && FILES[title.textContent.trim()]) return title.textContent.trim();
+      const raw = (el.id || "").replace(/-\d+$/, "").replace(/^flowchart-/, "");
+      if (FILES[raw]) return raw;
+      for (const key of Object.keys(FILES)) {
+        if ((el.id || "").includes(key) || el.textContent.includes(key)) return key;
+      }
+      return "";
+    }
+
+    window.showNode = function showNode(id) {
+      const data = FILES[id];
+      document.querySelectorAll(".diagram-inner .node").forEach((n) => {
+        n.classList.toggle("is-selected", nodeKeyFromEl(n) === id);
+      });
+      if (!data) {
+        panelTitle.textContent = id || "Files";
+        panelEmpty.hidden = false;
+        panelEmpty.textContent = "No file list for this node.";
+        panelList.hidden = true;
+        panelList.innerHTML = "";
+        return;
+      }
+      panelTitle.textContent = data.label || id;
+      const files = Array.isArray(data.files) ? data.files : [];
+      if (!files.length) {
+        panelEmpty.hidden = false;
+        panelEmpty.textContent = "No files listed for this module.";
+        panelList.hidden = true;
+        panelList.innerHTML = "";
+        return;
+      }
+      panelEmpty.hidden = true;
+      panelList.hidden = false;
+      panelList.innerHTML = files.map((file) => {
+        const generated = !!file.generated || file.status === "generated";
+        const emoji = STATUS_EMOJI[file.status] || (generated ? "🤖" : "🟡");
+        const path = String(file.path || "").replace(/</g, "&lt;");
+        const add = file.add == null ? 0 : file.add;
+        const del = file.del == null ? 0 : file.del;
+        return `<li class="${generated ? "is-generated" : ""}"><span>${emoji}</span><span class="path">${path}</span><span class="pm">+${add} / -${del}</span></li>`;
+      }).join("");
+    };
+
+    const mermaidSource = (document.querySelector("#diagram-inner pre.mermaid") || {}).textContent || "";
+    let selectedId = null;
+
+    const inner = document.getElementById("diagram-inner");
+    const stage = document.getElementById("diagram-stage");
+    const resetBtn = document.getElementById("zoom-reset");
+    let scale = 1;
+
+    function isDarkTheme() {
+      return document.documentElement.getAttribute("data-theme") !== "light";
+    }
+
+    function mermaidOptions() {
+      const dark = isDarkTheme();
+      return {
+        startOnLoad: false,
+        theme: dark ? "dark" : "default",
+        themeVariables: dark ? {
+          darkMode: true,
+          background: "transparent",
+          primaryTextColor: "#e2e8f0",
+          lineColor: "#64748b",
+          clusterBkg: "#0f172a",
+          clusterBorder: "#334155",
+          titleColor: "#94a3b8",
+          fontFamily: "Outfit, system-ui, sans-serif",
+          fontSize: "16px"
+        } : {
+          darkMode: false,
+          background: "transparent",
+          primaryTextColor: "#0f172a",
+          lineColor: "#64748b",
+          clusterBkg: "#f1f5f9",
+          clusterBorder: "#cbd5e1",
+          titleColor: "#475569",
+          fontFamily: "Outfit, system-ui, sans-serif",
+          fontSize: "16px"
+        },
+        flowchart: {
+          curve: "linear",
+          padding: 14,
+          htmlLabels: true,
+          nodeSpacing: 40,
+          rankSpacing: 52,
+          useMaxWidth: true
+        },
+        securityLevel: "loose"
+      };
+    }
+
+    function applyZoom() {
+      inner.style.transform = "scale(" + scale + ")";
+      resetBtn.textContent = Math.round(scale * 100) + "%";
+    }
+
+    function bindNodeClicks() {
+      const svg = inner.querySelector("svg");
+      if (svg) {
+        svg.style.width = "100%";
+        svg.style.height = "auto";
+        svg.style.maxWidth = "none";
+      }
+      inner.querySelectorAll(".node").forEach((node) => {
+        node.style.cursor = "pointer";
+        node.addEventListener("click", () => {
+          const key = nodeKeyFromEl(node);
+          if (key) window.showNode(key);
+        });
+      });
+    }
+
+    async function renderDiagram() {
+      mermaid.initialize(mermaidOptions());
+      inner.innerHTML = '<pre class="mermaid"></pre>';
+      inner.querySelector("pre.mermaid").textContent = mermaidSource;
+      await mermaid.run();
+      bindNodeClicks();
+      if (selectedId) window.showNode(selectedId);
+    }
+
+    const _showNode = window.showNode;
+    window.showNode = function showNode(id) {
+      selectedId = id;
+      return _showNode(id);
+    };
+
+    function currentTheme() {
+      return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+    }
+
+    function syncToggleButton() {
+      const btn = document.getElementById("theme-toggle");
+      if (!btn) return;
+      const theme = currentTheme();
+      btn.textContent = theme === "dark" ? "☀️" : "🌙";
+      btn.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
+    }
+
+    syncToggleButton();
+    renderDiagram();
+
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+      const next = currentTheme() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("prism-theme", next); } catch (e) {}
+      syncToggleButton();
+      renderDiagram();
+    });
+
+    document.getElementById("zoom-in").addEventListener("click", () => {
+      scale = Math.min(2.4, scale + 0.15);
+      applyZoom();
+    });
+    document.getElementById("zoom-out").addEventListener("click", () => {
+      scale = Math.max(0.4, scale - 0.15);
+      applyZoom();
+    });
+    resetBtn.addEventListener("click", () => {
+      scale = 1;
+      applyZoom();
+    });
+    stage.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      scale = Math.min(2.4, Math.max(0.4, scale + (event.deltaY > 0 ? -0.1 : 0.1)));
+      applyZoom();
+    }, { passive: false });
+  </script>
+</body>
+</html>
