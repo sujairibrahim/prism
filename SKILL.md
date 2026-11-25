@@ -1,12 +1,16 @@
 ---
 name: prism
-description: Use when the user runs /prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch. Also use for /prism queue, or when the user asks which PRs are waiting on their review.
+description: Use when the user runs /prism or $prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch. Also use for /prism queue, or when the user asks which PRs are waiting on their review.
 argument-hint: [PR number or link | queue] [since | comment] [save]
 ---
 
 # PRism 🔺
 
 Show a clear flowchart of a GitHub pull request, or of your own branch before a PR exists. Follow these steps in order. Do not skip steps. Use plain language in the HTML and in your short chat reply.
+
+**Works in any agent that supports Agent Skills** (Claude Code, Codex, and others):
+- **Skill folder** means the folder this `SKILL.md` is in, for example `~/.claude/skills/prism/` (Claude Code) or `~/.agents/skills/prism/` (Codex). Use its real absolute path wherever this file says `<skill folder>`.
+- **Command name:** this file writes `/prism`. If the user called the skill another way (for example `$prism` in Codex), use that same form in every command you suggest back to them.
 
 There are two modes:
 - **PR mode** — a PR already exists. This is the normal flow.
@@ -16,7 +20,7 @@ There are two modes:
 
 ## 1. Parse the input
 
-Input: $ARGUMENTS (for example `/prism 23`, `/prism https://github.com/OWNER/REPO/pull/23`, `/prism 23 since`, `/prism`, or `/prism branch base=develop`). Options can come in any order after the PR or `branch`: `since [sha]`, `comment`, `post`, `base=<name>`, `+uncommitted`, `save`.
+Input: the text the user gave after the skill name. In Claude Code it is $ARGUMENTS; in other agents, read it from the user's message (for example `$prism 42 since`, or "map PR 42"). Examples: `/prism 23`, `/prism https://github.com/OWNER/REPO/pull/23`, `/prism 23 since`, `/prism`, or `/prism branch base=develop`. Options can come in any order after the PR or `branch`: `since [sha]`, `comment`, `post`, `base=<name>`, `+uncommitted`, `save`.
 
 **A PR number or URL was given → PR mode:**
 
@@ -48,11 +52,11 @@ Input: $ARGUMENTS (for example `/prism 23`, `/prism https://github.com/OWNER/REP
 The script `prism_collect.py` (in the skill folder, next to this file) does the counting, grouping, conflict check, and risk score. Its numbers are the source of truth. Do not recount lines, regroup files, or redo the risk math yourself.
 
 1. Run it. `<tmp>` is `"${TMPDIR:-/tmp}/prism-<N>.json"` (use `prism-branch.json` in author mode).
-   - PR mode: `python3 ~/.claude/skills/prism/prism_collect.py <N or URL exactly as given> --save <tmp>`
+   - PR mode: `python3 <skill folder>/prism_collect.py <N or URL exactly as given> --save <tmp>`
    - Since mode: add `--since last` (for `since` alone) or `--since <sha>`.
-   - Author mode: `python3 ~/.claude/skills/prism/prism_collect.py --branch --save <tmp>`, plus `--base <name>` for `base=<name>` and `--uncommitted` for `+uncommitted` (or when the user asks in chat to include uncommitted or working changes).
+   - Author mode: `python3 <skill folder>/prism_collect.py --branch --save <tmp>`, plus `--base <name>` for `base=<name>` and `--uncommitted` for `+uncommitted` (or when the user asks in chat to include uncommitted or working changes).
 
-   Use the skill folder you are reading this from; in a project it may be `.claude/skills/prism/`.
+   `<skill folder>` is the folder this `SKILL.md` is in (see the top of this file).
 2. If it exits non-zero, stop and tell the user its `message`. Exit 2: install `gh`. Exit 3: run `gh auth login`. Exit 4: wrong input (bad PR number or link, not a git repo, no base branch, or nothing to compare). Exit 5: `gh` or `git` failed.
 3. It prints one short JSON object (long file lists are cut to 10, with the rest counted in `files_more`; the saved file has everything):
    - `pr` — `mode` (`pr`, `since`, or `branch`), repo, number, title, url, author, state, base, head, mergeable, body, commits. Author mode adds `base_ref`, `safe_name` (the branch name made safe for file names), `commit_count`, `uncommitted_files`, `includes_uncommitted`, and `pushed`.
@@ -238,7 +242,7 @@ flowchart TB
 
 ## 9. Write the HTML file
 
-1. Read `template.html` from the skill folder (the folder this SKILL.md is in), usually `~/.claude/skills/prism/template.html`, or `.claude/skills/prism/template.html` in the project.
+1. Read `<skill folder>/template.html`.
 2. Replace these placeholders exactly:
    - `{{TITLE}}` — PR number and title. Example: `#42 Add JWT login`. Author mode: the suggested PR title, no number. Example: `Add JWT login`
    - `{{PR_URL}}` — the PR `url` from step 2, as plain text. Example: `https://github.com/acme/api/pull/42`. The page uses it to link every file to its diff on GitHub. If it is missing or wrong, files show as plain text. Author mode: an empty string (there is no PR to link to yet).
@@ -418,7 +422,7 @@ flowchart TB
 4. Fill the file list, then check that no placeholder is left (the `grep` must print nothing):
 
    ```bash
-   python3 ~/.claude/skills/prism/prism_collect.py --fill-files <page path> <tmp>
+   python3 <skill folder>/prism_collect.py --fill-files <page path> <tmp>
    grep -oE '\{\{[A-Z_]+\}\}' <page path>
    ```
 
@@ -588,7 +592,7 @@ Use the step 6 rubric, but only with file paths and line counts. Start at 1, add
 
 ## Q4. Write the queue page
 
-1. Read `queue-template.html` from the skill folder, usually `~/.claude/skills/prism/queue-template.html`.
+1. Read `<skill folder>/queue-template.html`.
 2. Replace these placeholders exactly:
    - `{{TITLE}}` — `Review queue · owner/repo`, or `Review queue · all repos`. It appears twice (tab title and heading).
    - `{{META}}` — HTML chips:

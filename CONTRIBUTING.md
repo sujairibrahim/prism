@@ -11,7 +11,7 @@ Open an [issue](../../issues/new/choose) and pick a form. For a bug, include the
 1. Fork the repo and create a branch.
 2. Make your change. Keep it small and focused on one thing.
 3. Test it:
-   - Copy your version into your skills folder (`~/.claude/skills/prism`) and run `/prism` on a real PR.
+   - Copy your version into your skills folder (`~/.claude/skills/prism` for Claude Code, `~/.agents/skills/prism` for Codex) and run it on a real PR.
    - If you changed `prism_collect.py`, check that `python3 -m py_compile prism_collect.py` passes and run it on a public PR, for example `python3 prism_collect.py cli/cli#12000`.
    - If you changed `template.html`, update `example.html` the same way and open it in a browser.
 4. Open a pull request into `main` and fill in the short checklist.
