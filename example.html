@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
+      --font-sans: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       --bg: #070b14;
       --card: rgba(16, 24, 39, 0.78);
       --border: rgba(148, 163, 184, 0.16);
@@ -64,6 +66,9 @@
       --pill-breaking-bg: #b91c1c;
       --tooltip-bg: #0b1220;
       --tooltip-fg: #f8fafc;
+      --note-fg: #cbd5e1;
+      --note-bg: rgba(148, 163, 184, 0.1);
+      --note-border: rgba(148, 163, 184, 0.35);
     }
 
     :root[data-theme="light"] {
@@ -121,6 +126,9 @@
       --pill-breaking-bg: #fca5a5;
       --tooltip-bg: #0f172a;
       --tooltip-fg: #f8fafc;
+      --note-fg: #475569;
+      --note-bg: rgba(71, 85, 105, 0.08);
+      --note-border: rgba(71, 85, 105, 0.3);
     }
 
     @media (prefers-color-scheme: light) {
@@ -179,6 +187,9 @@
         --pill-breaking-bg: #fca5a5;
         --tooltip-bg: #0f172a;
         --tooltip-fg: #f8fafc;
+        --note-fg: #475569;
+        --note-bg: rgba(71, 85, 105, 0.08);
+        --note-border: rgba(71, 85, 105, 0.3);
       }
     }
 
@@ -189,7 +200,7 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: "Outfit", system-ui, sans-serif;
+      font-family: var(--font-sans);
       line-height: 1.5;
     }
 
@@ -282,7 +293,7 @@
       border: 1px solid var(--border);
       background: var(--chip-bg);
       color: var(--text);
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
 
@@ -306,7 +317,7 @@
       padding: 5px 11px;
       border-radius: 999px;
       border: 1px solid transparent;
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 600;
     }
@@ -374,6 +385,16 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
     }
     .affected-empty { margin: 0; color: var(--muted); font-size: 13px; }
+    .affected-note {
+      flex-basis: 100%;
+      margin: 2px 0 0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--note-border);
+      background: var(--note-bg);
+      color: var(--note-fg);
+      font-size: 12px;
+    }
 
 
     .grid-top {
@@ -551,6 +572,32 @@
       stroke-width: 3px !important;
     }
 
+    .map-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 40px 16px;
+      text-align: center;
+    }
+    .map-fallback p { margin: 0; }
+    .map-fallback-msg { color: var(--warn-fg); font-weight: 600; }
+    .map-fallback-hint { color: var(--muted); font-size: 13px; }
+    .map-fallback-nodes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .map-fallback-nodes button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 5px 11px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .map-fallback-nodes button:hover,
+    .map-fallback-nodes button.is-selected { border-color: var(--accent); color: var(--accent); }
+
     .file-panel {
       border-radius: 14px;
       background: var(--stage-bg);
@@ -580,12 +627,12 @@
       font-size: 13px;
     }
     .file-list .path {
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       word-break: break-all;
     }
     .file-list .pm {
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 11px;
       color: var(--muted);
       white-space: nowrap;
@@ -710,14 +757,15 @@
       <section class="card risk-card">
         <h2>Risk meter 🔥</h2>
         
-        <div class="risk-meter" data-score="9" data-level="high">
-          <div class="risk-head"><span class="risk-num">9</span><span class="risk-max">/10</span><span class="risk-level high">High</span></div>
-          <div class="risk-bar"><div class="risk-fill high" style="width:90%"></div></div>
+        <div class="risk-meter" data-score="6" data-level="medium">
+          <div class="risk-head"><span class="risk-num">6</span><span class="risk-max">/10</span><span class="risk-level medium">Medium</span></div>
+          <div class="risk-bar"><div class="risk-fill medium" style="width:60%"></div></div>
           <ul class="risk-reasons">
-            <li>Touches auth and a new JWT login path</li>
-            <li>Adds a users migration</li>
-            <li>Updates requirements.txt</li>
-            <li>Overlaps open PR 38 on auth</li>
+            <li>New JWT login flow in auth +3</li>
+            <li>Adds a users migration +1</li>
+            <li>Updates requirements.txt +1</li>
+            <li>Overlaps open PR 38 on auth +1</li>
+            <li>Tests cover the new login −1</li>
           </ul>
         </div>
 
@@ -838,7 +886,20 @@
 
   <script type="application/json" id="prism-files">{"DB": {"label": "users migration", "files": [{"path": "db/users_migration.sql", "add": 40, "del": 0, "status": "risky", "generated": false}]}, "AUTH": {"label": "auth", "files": [{"path": "src/api/auth.py", "add": 80, "del": 0, "status": "risky", "generated": false}]}, "USER": {"label": "user service", "files": [{"path": "src/services/user.py", "add": 24, "del": 6, "status": "modified", "generated": false}]}, "TEST": {"label": "test_auth", "files": [{"path": "tests/test_auth.py", "add": 55, "del": 0, "status": "tests", "generated": false}]}, "DEPS": {"label": "requirements.txt", "files": [{"path": "requirements.txt", "add": 2, "del": 0, "status": "deps", "generated": false}]}, "GEN": {"label": "auto-generated", "files": [{"path": "poetry.lock", "add": 80, "del": 0, "status": "generated", "generated": true}]}}</script>
   <script type="module">
-    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    // Mermaid loads from a CDN. It is imported lazily so the rest of the page
+    // (theme, zoom, file panel) still works when it cannot load.
+    const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    const OFFLINE_MSG = "The PR map needs an internet connection to load Mermaid.";
+    const RENDER_ERROR_MSG = "The PR map could not be drawn because the Mermaid code on this page has an error.";
+    let mermaidPromise = null;
+
+    function loadMermaid() {
+      if (!mermaidPromise) {
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Mermaid load timed out")), 15000));
+        mermaidPromise = Promise.race([import(MERMAID_URL), timeout]).then((mod) => mod.default);
+      }
+      return mermaidPromise;
+    }
 
     const STATUS_EMOJI = {
       added: "🟢",
@@ -876,6 +937,9 @@
       const data = FILES[id];
       document.querySelectorAll(".diagram-inner .node").forEach((n) => {
         n.classList.toggle("is-selected", nodeKeyFromEl(n) === id);
+      });
+      document.querySelectorAll(".map-fallback-nodes button").forEach((b) => {
+        b.classList.toggle("is-selected", b.dataset.node === id);
       });
       if (!data) {
         panelTitle.textContent = id || "Files";
@@ -931,7 +995,7 @@
           clusterBkg: "#0f172a",
           clusterBorder: "#334155",
           titleColor: "#94a3b8",
-          fontFamily: "Outfit, system-ui, sans-serif",
+          fontFamily: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
           fontSize: "16px"
         } : {
           darkMode: false,
@@ -941,7 +1005,7 @@
           clusterBkg: "#f1f5f9",
           clusterBorder: "#cbd5e1",
           titleColor: "#475569",
-          fontFamily: "Outfit, system-ui, sans-serif",
+          fontFamily: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
           fontSize: "16px"
         },
         flowchart: {
@@ -977,11 +1041,54 @@
       });
     }
 
+    function showMapFallback(message) {
+      inner.innerHTML = "";
+      const box = document.createElement("div");
+      box.className = "map-fallback";
+      const msg = document.createElement("p");
+      msg.className = "map-fallback-msg";
+      msg.textContent = message;
+      box.appendChild(msg);
+      const ids = Object.keys(FILES);
+      if (ids.length) {
+        const hint = document.createElement("p");
+        hint.className = "map-fallback-hint";
+        hint.textContent = "You can still open each module's files:";
+        const list = document.createElement("div");
+        list.className = "map-fallback-nodes";
+        ids.forEach((id) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.node = id;
+          btn.textContent = (FILES[id] && FILES[id].label) || id;
+          btn.addEventListener("click", () => window.showNode(id));
+          list.appendChild(btn);
+        });
+        box.append(hint, list);
+      }
+      inner.appendChild(box);
+      if (selectedId) window.showNode(selectedId);
+    }
+
     async function renderDiagram() {
-      mermaid.initialize(mermaidOptions());
-      inner.innerHTML = '<pre class="mermaid"></pre>';
-      inner.querySelector("pre.mermaid").textContent = mermaidSource;
-      await mermaid.run();
+      let mermaid;
+      try {
+        mermaid = await loadMermaid();
+      } catch (err) {
+        console.warn("PRism: could not load Mermaid", err);
+        showMapFallback(OFFLINE_MSG);
+        return;
+      }
+      try {
+        mermaid.initialize(mermaidOptions());
+        inner.innerHTML = '<pre class="mermaid"></pre>';
+        inner.querySelector("pre.mermaid").textContent = mermaidSource;
+        await mermaid.run();
+      } catch (err) {
+        console.error("PRism: could not draw the PR map", err);
+        showMapFallback(RENDER_ERROR_MSG);
+        return;
+      }
       bindNodeClicks();
       if (selectedId) window.showNode(selectedId);
     }

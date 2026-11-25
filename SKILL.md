@@ -15,6 +15,7 @@ Input: $ARGUMENTS (for example `/prism 23` or `/prism https://github.com/OWNER/R
 - If the user gave a number, use that number in the current repo.
 - If the user gave a URL like `https://github.com/OWNER/REPO/pull/123`, use repo `OWNER/REPO` and number `123`. Pass `--repo OWNER/REPO` to every `gh` command.
 - First run `gh auth status`. If it fails, stop and tell the user to run `gh auth login`.
+- Check if the current folder is a local clone of the PR's repo. Run `gh repo view --json nameWithOwner -q .nameWithOwner`. It is local if that prints the PR's `OWNER/REPO` (ignore case), or if `git remote -v` lists `OWNER/REPO` (for forks). If the command fails (no git repo) or names a different repo, it is **not local**. Remember this for step 6.
 
 ## 2. Fetch PR data
 
@@ -52,17 +53,25 @@ Split files into **real code** and **generated**.
 
 ## 5. Risk, review path, and diagram
 
-**Risk meter 🔥** — start at 1, add the points below, cap at 10. Level: 1-3 low, 4-6 medium, 7-10 high.
+**Risk meter 🔥** — start at 1 and add or subtract the points below. Use only file paths and line counts from step 2. "Lines" means real lines changed (adds + dels), with generated files left out.
 
-- Auth, permissions, or security: +3
-- Real schema or migration changes (not only a generated snapshot): +2
-- Config or CI: +1
-- Dependency manifest changes: +1
-- Real code size: +1 if real additions are 500-1499, +2 if 1500 or more
-- Tests: +2 if the change has no tests, +1 if tests look thin next to the real code
-- Conflicts: +2 if `mergeable` is `CONFLICTING` or another open PR overlaps files
+1. **Sensitive code** (auth, permissions, security, payments). Count the lines changed in those files:
+   - under 50 lines: +1
+   - 50-199 lines: +2
+   - 200+ lines, or the PR adds a new login, token, or permission flow: +3
+2. **Migrations or schema** (real ones, not only a generated snapshot): +1 if they only add (new tables, columns, indexes); +2 if they change or drop existing data (`ALTER`, `DROP`, `RENAME`, backfills).
+3. **Config or CI**: +1
+4. **Dependency manifests**: +1
+5. **Size** of all real code: +1 for 300-999 lines, +2 for 1000-2999, +3 for 3000+.
+6. **Tests** (skip this rule for docs/config-only PRs and for code changes under 20 lines):
+   - no test files changed: +2
+   - tests changed but thin (test lines are under a quarter of the other real lines): +1
+   - tests changed alongside sensitive code or a migration, and not thin: −1
+7. **Conflicts**: +2 if `mergeable` is `CONFLICTING`; otherwise +1 if another open PR touches the same files.
 
-Give 2-4 short reasons that match the points you added.
+Then cap at 10. The lowest score is 1, or 2 if sensitive code or a migration changed. Level: 1-3 low, 4-6 medium, 7-10 high.
+
+Give one short reason per rule that scored, with its points, biggest first (for example `New JWT login flow +3`). Leave out rules that scored 0.
 
 **Review path 🧭** — pick the order a reviewer should read the modules, usually: data/schema → core logic → API → clients → tests/docs. Skip the generated node, branch nodes, and conflict nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
 
@@ -96,11 +105,13 @@ Pick exactly one PR type from the title, commit messages, and diff:
 
 **Before and after** — two short plain-English lines, from a user or developer view of app behaviour: `Before: ...` then `After: ...`.
 
-**Affected features** — list existing features that use the changed code. In the local repo, run `rg` for callers or imports of the changed functions and files. Use a short name (2–4 words) for each. Mark each **breaking**, **may break**, **changed**, or **safe**, and output them in that order (breaking first, safe last). Put any short reason in the `title` attribute only, not as visible text. If a change is breaking (removed or renamed public API, changed config or env, a DB migration, or a changed response shape), mark it **breaking** and add the reason in `title`. If nothing existing is touched, write: `No existing features affected (new code only)`.
+**Affected features** — list existing features that use the changed code. If the repo is local (step 1), run `rg` for callers or imports of the changed functions and files (if `rg` is not installed, use `git grep -n`). Use a short name (2–4 words) for each. Mark each **breaking**, **may break**, **changed**, or **safe**, and output them in that order (breaking first, safe last). Put any short reason in the `title` attribute only, not as visible text. If a change is breaking (removed or renamed public API, changed config or env, a DB migration, or a changed response shape), mark it **breaking** and add the reason in `title`. If nothing existing is touched, write: `No existing features affected (new code only)`.
+
+If the repo is **not local**, do not search and do not guess callers. Infer affected features only from the diff itself (the files and functions it changes), and add this note at the end of the Affected section: `Callers not checked — run /prism from a local clone of OWNER/REPO for a full check` (use the real `OWNER/REPO`).
 
 ## 7. Copy this style
 
-Fake PR `#42` Add JWT login, `feature/jwt-login` → `main`, open, real code +201 / -6, total +281 / -6 because of one generated lockfile +80 / -0. Overlaps `src/api/auth.py` with open PR 38 Session refresh. Risk 9/10 high: auth +3, migration +2, deps +1, overlap +2.
+Fake PR `#42` Add JWT login, `feature/jwt-login` → `main`, open, real code +201 / -6, total +281 / -6 because of one generated lockfile +80 / -0. Overlaps `src/api/auth.py` with open PR 38 Session refresh, but still mergeable. Risk 6/10 medium: new JWT login flow +3, adds a users migration +1, deps +1, overlap +1, tests cover the login −1 (55 test lines next to 152 other real lines, so not thin).
 
 PR type: New feature.
 Before: The API had no JWT login, so users could not sign in with a token.
@@ -218,19 +229,26 @@ flowchart TB
      </div>
      ```
 
+     If the repo is not local, add the note as the last item inside `<div class="affected">`, after the list or the empty line:
+
+     ```html
+     <p class="affected-note">Callers not checked — run /prism from a local clone of OWNER/REPO for a full check</p>
+     ```
+
    - `{{SUMMARY}}` — exactly three `<li>` bullets: what changed, why it matters, and any risk or conflict.
    - `{{CONFLICTS}}` — overlaps in `<div class="conflicts-warn">...</div>`. Merged or closed: `<div class="conflicts-ok">This PR is already merged. Conflicts are resolved.</div>` (say "closed" when it is closed). Open with no overlap: `<div class="conflicts-ok">No conflicts found ✅</div>`.
    - `{{RISK}}` — use this shape (level class is `low`, `medium`, or `high` on both `risk-level` and `risk-fill`; fill width is score times 10%):
 
      ```html
-     <div class="risk-meter" data-score="9" data-level="high">
-       <div class="risk-head"><span class="risk-num">9</span><span class="risk-max">/10</span><span class="risk-level high">High</span></div>
-       <div class="risk-bar"><div class="risk-fill high" style="width:90%"></div></div>
+     <div class="risk-meter" data-score="6" data-level="medium">
+       <div class="risk-head"><span class="risk-num">6</span><span class="risk-max">/10</span><span class="risk-level medium">Medium</span></div>
+       <div class="risk-bar"><div class="risk-fill medium" style="width:60%"></div></div>
        <ul class="risk-reasons">
-         <li>Touches auth and a new JWT login path</li>
-         <li>Adds a users migration</li>
-         <li>Updates requirements.txt</li>
-         <li>Overlaps open PR 38 on auth</li>
+         <li>New JWT login flow in auth +3</li>
+         <li>Adds a users migration +1</li>
+         <li>Updates requirements.txt +1</li>
+         <li>Overlaps open PR 38 on auth +1</li>
+         <li>Tests cover the new login −1</li>
        </ul>
      </div>
      ```
