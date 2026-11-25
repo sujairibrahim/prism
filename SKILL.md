@@ -1,7 +1,7 @@
 ---
 name: prism
 description: Use when the user runs /prism <PR number or URL>, or asks to explain, visualize, or map a GitHub pull request by number or link.
-argument-hint: <PR number or URL> [save]
+argument-hint: <PR number or URL> [since [sha]] [save]
 ---
 
 # PRism 🔺
@@ -14,6 +14,7 @@ Input: $ARGUMENTS (for example `/prism 23` or `/prism https://github.com/OWNER/R
 
 - If the user gave a number, use that number in the current repo.
 - If the user gave a URL like `https://github.com/OWNER/REPO/pull/123`, use repo `OWNER/REPO` and number `123`. Pass `--repo OWNER/REPO` to every `gh` command.
+- If the input has `since` after the PR (for example `/prism 42 since` or `/prism 42 since abc1234`), turn on **since mode** (step 3). `since` alone means "since my last review". `since <sha>` means "since this commit".
 - First run `gh auth status`. If it fails, stop and tell the user to run `gh auth login`.
 
 ## 2. Fetch PR data
@@ -21,13 +22,43 @@ Input: $ARGUMENTS (for example `/prism 23` or `/prism https://github.com/OWNER/R
 Run:
 
 ```bash
-gh pr view <N> --json number,title,body,author,state,baseRefName,headRefName,files,commits,additions,deletions,mergeable,mergedAt,url
+gh pr view <N> --json number,title,body,author,state,baseRefName,headRefName,headRefOid,files,commits,additions,deletions,mergeable,mergedAt,url
 gh pr diff <N>
 ```
 
 Skim the diff so you can say what each module does. If the diff is huge (about 2000+ lines or 40+ files), use `gh pr diff <N> --name-only`, then read only the important files: risky files first, then the largest modules.
 
-## 3. Conflict check
+## 3. Since mode (skip this step without `since`)
+
+Show only what changed since the user last looked. You need `OWNER/REPO`: take it from the URL, or run `gh repo view --json nameWithOwner --jq .nameWithOwner`.
+
+1. **Find the starting commit.**
+   - `since <sha>`: use that sha. Skip to 2.
+   - `since` alone: find the user's latest submitted review.
+
+     ```bash
+     gh api user --jq .login
+     gh api repos/OWNER/REPO/pulls/<N>/reviews --paginate --jq '.[] | select(.user.login == "LOGIN" and .state != "PENDING") | "\(.commit_id) \(.submitted_at)"' | tail -n 1
+     ```
+
+     Reviews come oldest first, so the last line is the latest one. Any review counts (approved, changes requested, commented). It prints `<commit_id> <submitted_at>`. Write the date like `24 Nov 2026`.
+   - If it prints nothing, the user never reviewed this PR. Say so, then make the normal full-PR page (skip the rest of this step) with the fallback banner: "You have not reviewed this PR yet, so this shows the full PR."
+2. **Get the delta.** Do not add `--paginate`: GitHub only sends the file list on the first page.
+
+   ```bash
+   gh api repos/OWNER/REPO/compare/<since>...<headRefOid> --jq '{status, ahead_by, behind_by, total_commits, commits: [.commits[] | {sha: .sha[0:7], msg: (.commit.message | split("\n")[0])}], files: [.files[] | {filename, status, additions, deletions, previous_filename}]}'
+   gh api repos/OWNER/REPO/compare/<since>...<headRefOid> -H "Accept: application/vnd.github.diff"
+   ```
+
+   The first gives the new commits and changed files. The second is the delta diff to skim instead of `gh pr diff`.
+3. **Check `status`.**
+   - `ahead` — good. Use the delta.
+   - `identical` — nothing new since the review. Do not write a page. Reply: "No new commits on PR <N> since your review on <date> (commit abc1234)."
+   - `diverged` or `behind`, or the call fails with `Not Found (HTTP 404)` — the old commit is no longer in the branch history, usually because of a force-push or rebase. Do not try to diff file by file: the old and new commits may sit on different bases, so the result would mix in base-branch changes. Make the normal full-PR page with the fallback banner: "Commit abc1234 is no longer in this branch (likely a force-push or rebase), so this shows the full PR."
+4. **Limits.** `files` holds at most 300 files. If you get exactly 300, add to the banner: "GitHub lists at most 300 files, so some may be missing." Use `total_commits` for the commit count, not the length of `commits`. If a new commit is a merge from the base branch (like "Merge branch 'main'"), say in the summary that the delta includes base-branch changes.
+5. **Use the delta in the next steps.** Group, classify, risk, review path, map, before/after, affected features, summary, and `{{FILES_JSON}}` use only the delta files and delta diff. Compare file status `removed` is 🔴 deleted, and `renamed` is 🟡 modified. "Before" means at your review and "After" means now. Conflicts stay PR-wide (step 4), because a merge takes the whole PR.
+
+## 4. Conflict check
 
 - If the PR is **open**:
   1. Run `gh pr list --base <baseRefName> --state open --json number,title,headRefName,files`.
@@ -35,7 +66,7 @@ Skim the diff so you can say what each module does. If the diff is huge (about 2
   3. Also check `mergeable`. If it is `CONFLICTING`, say this PR already conflicts with the base branch.
 - If the PR is **merged** or **closed**: say conflicts are already resolved or no longer apply, and skip the overlap check.
 
-## 4. Group files, mute noise, classify
+## 5. Group files, mute noise, classify
 
 Split files into **real code** and **generated**.
 
@@ -50,7 +81,7 @@ Split files into **real code** and **generated**.
 - 🔥 risky — auth, security, migrations, config, CI, permissions, payments
 - Risky wins over added or modified. Tests stay 🧪.
 
-## 5. Risk, review path, and diagram
+## 6. Risk, review path, and diagram
 
 **Risk meter 🔥** — start at 1, add the points below, cap at 10. Level: 1-3 low, 4-6 medium, 7-10 high.
 
@@ -62,7 +93,7 @@ Split files into **real code** and **generated**.
 - Tests: +2 if the change has no tests, +1 if tests look thin next to the real code
 - Conflicts: +2 if `mergeable` is `CONFLICTING` or another open PR overlaps files
 
-Give 2-4 short reasons that match the points you added.
+Give 2-4 short reasons that match the points you added. In since mode, score the delta only (sizes, tests, and risky files from the new changes); the conflict point still counts.
 
 **Review path 🧭** — pick the order a reviewer should read the modules, usually: data/schema → core logic → API → clients → tests/docs. Skip the generated node, branch nodes, and conflict nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
 
@@ -84,7 +115,7 @@ classDef conflict fill:#7f1d1d,stroke:#ef4444,color:#fecaca,stroke-dasharray:5 5
 
 **Mermaid syntax rules** (or the diagram will fail): unique ids of letters and numbers only (never `end`); always quote labels; avoid `()`, `[]`, and `#` even inside quotes (write `PR 38`, not `PR #38`); paste raw Mermaid into the template, no fences.
 
-## 6. PR type, before/after, and affected features
+## 7. PR type, before/after, and affected features
 
 Pick exactly one PR type from the title, commit messages, and diff:
 - **New feature** — added files or routes that introduce a capability
@@ -98,7 +129,7 @@ Pick exactly one PR type from the title, commit messages, and diff:
 
 **Affected features** — list existing features that use the changed code. In the local repo, run `rg` for callers or imports of the changed functions and files. Use a short name (2–4 words) for each. Mark each **breaking**, **may break**, **changed**, or **safe**, and output them in that order (breaking first, safe last). Put any short reason in the `title` attribute only, not as visible text. If a change is breaking (removed or renamed public API, changed config or env, a DB migration, or a changed response shape), mark it **breaking** and add the reason in `title`. If nothing existing is touched, write: `No existing features affected (new code only)`.
 
-## 7. Copy this style
+## 8. Copy this style
 
 Fake PR `#42` Add JWT login, `feature/jwt-login` → `main`, open, real code +201 / -6, total +281 / -6 because of one generated lockfile +80 / -0. Overlaps `src/api/auth.py` with open PR 38 Session refresh. Risk 9/10 high: auth +3, migration +2, deps +1, overlap +2.
 
@@ -161,7 +192,7 @@ flowchart TB
   linkStyle 1,2,3 stroke:#22d3ee,stroke-width:3px
 ```
 
-## 8. Write the HTML file
+## 9. Write the HTML file
 
 1. Read `template.html` from the skill folder, usually `~/.claude/skills/prism/template.html`.
 2. Replace these placeholders exactly:
@@ -180,6 +211,18 @@ flowchart TB
      ```
 
      State chip: `chip chip-state open`, `merged`, or `closed`.
+
+     In since mode, the "real code" and "total" chips count the delta only. Then add one muted chip with the full-PR totals, from step 2: `<span class="chip chip-muted">full PR +281 / -6 · 7 files</span>`.
+   - `{{SINCE_BANNER}}` — an empty string in normal mode. In since mode:
+
+     ```html
+     <div class="since-banner">
+       <strong>Changes since your review on 24 Nov 2026 (commit <code>abc1234</code>) — 3 new commits</strong>
+       <span>5 files changed. Map, modules, risk, and review path cover only these changes.</span>
+     </div>
+     ```
+
+     For `since <sha>`, start with "Changes since commit `abc1234`". Write "1 new commit" for one. For a fallback (never reviewed, force-push, or rebase), use `<div class="since-banner is-fallback"><strong>Showing the full PR</strong><span>...reason from step 3...</span></div>`.
    - PR type badge (goes inside `{{META}}`, first) — exactly one badge. Class: `type-new`, `type-improves`, `type-fix`, `type-removes`, `type-refactor`, or `type-docs`.
 
      ```html
@@ -242,9 +285,10 @@ flowchart TB
 3. Where to write it:
    - **Default (temporary):** write to a hidden folder in the current project: `./.prism/pr-<N>.html` (create the folder). Keep it out of git without touching tracked files: if inside a git repo, append `.prism/` to `$(git rev-parse --git-common-dir)/info/exclude` when it is not already there. Never edit `.gitignore`. It stays inside the project so the editor or Claude app preview can open it.
    - **Save only if asked:** if the input or chat says `save` (for example `/prism 741 save`) or the user asks to keep it, write to `./prism-output/pr-<N>.html` in the current working directory instead.
+   - **Since mode:** name the file `pr-<N>-since-<shortsha>.html` in the same folder, where `<shortsha>` is the first 7 characters of the starting commit. Example: `./.prism/pr-42-since-abc1234.html`. A fallback page shows the full PR, so it uses the normal `pr-<N>.html` name.
 4. Do NOT open the file or a browser yourself. Never run `open`, `xdg-open`, or `start`. The user decides where to view it.
 
-## 9. Reply in chat
+## 10. Reply in chat
 
 Reply with only:
 
@@ -252,5 +296,12 @@ Reply with only:
 2. One line: main modules changed, with real-code +adds / -dels (and total if generated files were muted).
 3. One line: risk score and conflict status.
 4. A clickable link to the page, as a Markdown link with the absolute path, like `[🔺 Open PR #<N> map](file:///absolute/path/pr-<N>.html)`. Use the real absolute path of the file you wrote (use `pwd`). If it is the temporary copy, add: "Temporary view in `.prism/` (ignored by git). Run `/prism <N> save` to keep it in `prism-output/`." On the next line, also print the plain absolute path so it can be copied into any browser or editor preview. Then add one more line with a command the user can copy to open it, in a code block: `open <absolute path>` on macOS (`xdg-open` on Linux, `start` on Windows). Only show this command; never run it yourself.
+
+In since mode, change lines 2 and 3:
+
+- Line 2: "Since your review on <date> (commit abc1234): 3 new commits, 5 files changed, real code +40 / -12." For `since <sha>`, say "Since commit abc1234".
+- Line 3: the delta risk score and level, then conflict status. Example: "Delta risk 4/10 medium. No conflicts found."
+- In the save hint, use `/prism <N> since <shortsha> save`.
+- On a fallback, start the reply with why (never reviewed, or force-push/rebase) and say the page shows the full PR.
 
 Do not paste the Mermaid or a long report in chat.
