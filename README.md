@@ -10,7 +10,7 @@ The page includes:
 - Affected features
 - A risk meter from 1 to 10
 - A suggested review path
-- Conflicts with other open PRs
+- Real conflict check against the base branch and other open PRs: real conflicts and clean overlaps are shown apart
 - A Mermaid PR map — click a module to see its files
 - Auto-generated files, shown muted on the map
 - Light and dark mode
@@ -20,6 +20,8 @@ The page includes:
 ## Install
 
 You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in.
+
+For the real conflict check, run `/prism` inside a full (not shallow) local clone of the PR's repo, with git 2.38 or newer. PRism fetches PR heads into private `refs/prism/*` refs, runs `git merge-tree`, and deletes those refs again. It never checks out a branch or touches your working tree. Anywhere else, it falls back to file overlap only and says so on the page.
 
 Copy these two files into your Claude Code skills folder:
 
