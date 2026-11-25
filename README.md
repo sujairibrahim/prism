@@ -9,9 +9,10 @@ The page includes:
 - Before and after
 - Affected features
 - A risk meter from 1 to 10
-- A suggested review path
+- A suggested review path — each step opens its module's files or jumps to its diff
 - Real conflict check against the base branch and other open PRs: real conflicts and clean overlaps are shown apart
 - A Mermaid PR map — click a module to see its files
+- Every file links straight to its diff on GitHub
 - Auto-generated files, shown muted on the map
 - Re-review mode: only what changed since your last review
 - Light and dark mode

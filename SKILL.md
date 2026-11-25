@@ -254,6 +254,7 @@ flowchart TB
 1. Read `template.html` from the skill folder, usually `~/.claude/skills/prism/template.html`.
 2. Replace these placeholders exactly:
    - `{{TITLE}}` — PR number and title. Example: `#42 Add JWT login`
+   - `{{PR_URL}}` — the PR `url` from step 2, as plain text. Example: `https://github.com/acme/api/pull/42`. The page uses it to link every file to its diff on GitHub. If it is missing or wrong, files show as plain text.
    - `{{META}}` — HTML chips. The first chip is always the PR type badge (see below):
 
      ```html
@@ -378,9 +379,16 @@ flowchart TB
      </div>
      ```
 
-   - `{{REVIEW_PATH}}` — an `<ol class="review-steps">` of the path. Each item: `<li><span class="step-num">①</span><div><strong>module</strong><p>Why look here.</p></div></li>`
+   - `{{REVIEW_PATH}}` — an `<ol class="review-steps">` of the path. Each item has `data-node` set to the node id from the diagram: `<li data-node="AUTH"><span class="step-num">②</span><div><strong>auth</strong><p>Why look here.</p></div></li>`. The page turns the module name into a button that opens that node's files, and adds a `diff ↗` link to its first file on GitHub.
    - `{{DIAGRAM}}` — raw Mermaid only, no fences.
-   - `{{FILES_JSON}}` — one JSON object, no fences. Keys are node ids. Value: `{"label":"auth","files":[{"path":"src/api/auth.py","add":80,"del":0,"status":"risky","generated":false}]}`. `status` is added, modified, deleted, tests, deps, risky, or generated. Use real paths when you have them; if you only have a module label, use that label as `path`. Do not invent paths.
+   - `{{FILES_JSON}}` — one JSON object, no fences. Keys are node ids. Value: `{"label":"auth","files":[{"path":"src/api/auth.py","url":"https://github.com/acme/api/pull/42/files#diff-a8722aff8c58891256e0272e9462a488d473bf4b198d8a76d2f4e2445dde7a00","add":80,"del":0,"status":"risky","generated":false}]}`. `status` is added, modified, deleted, tests, deps, risky, or generated. Use real paths when you have them; if you only have a module label, use that label as `path` and add `"isLabel":true` so it is not linked. Do not invent paths.
+   - `url` per file — GitHub's link to that file's diff: `<PR url>/files#diff-<sha256 of the path>`. Get every hash with one command (use `sha256sum` instead of `shasum -a 256` on Linux):
+
+     ```bash
+     gh pr view <N> --json files --jq '.files[].path' | while IFS= read -r p; do printf '%s %s\n' "$(printf '%s' "$p" | shasum -a 256 | cut -d' ' -f1)" "$p"; done
+     ```
+
+     Copy each hash exactly from the output. Never guess a hash. If you cannot run the command, leave `url` out. The page computes the same hash in the browser and uses it when it can; your `url` is the fallback for browsers that cannot, and the plain `<PR url>/files` page is the last fallback. Auto-generated files get a `url` too.
    - Before writing, check that no `{{` text is left in the page. Every placeholder must be replaced.
 3. Where to write it:
    - **Default (temporary):** write to a hidden folder in the current project: `./.prism/pr-<N>.html` (create the folder). Keep it out of git without touching tracked files: if inside a git repo, append `.prism/` to `$(git rev-parse --git-common-dir)/info/exclude` when it is not already there. Never edit `.gitignore`. It stays inside the project so the editor or Claude app preview can open it.
