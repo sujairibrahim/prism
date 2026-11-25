@@ -1,4 +1,4 @@
-# PRism 🔺
+# PRism
 
 See what a pull request does at a glance. PRism turns a GitHub PR, or your own branch before you open one, into a visual page: a summary, a risk score, the order to review in, real conflicts with other PRs, and a clickable map of the changed modules.
 
