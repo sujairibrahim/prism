@@ -17,6 +17,7 @@ The page includes:
 - Re-review mode: only what changed since your last review
 - A suggested PR description, in author mode
 - Light and dark mode
+- Optional: a Markdown comment posted on the PR, so the whole team sees the same map
 
 ![Example PRism page for fake PR #42 Add JWT login](example-page.png)
 
@@ -38,7 +39,7 @@ cp SKILL.md template.html ~/.claude/skills/prism/
 In Claude Code, run:
 
 ```text
-/prism <PR number or URL> [since [sha]] [save]
+/prism <PR number or URL> [since [sha]] [comment] [save]
 /prism [branch] [base=<name>] [+uncommitted] [save]
 ```
 
@@ -48,6 +49,7 @@ Examples:
 /prism 42
 /prism https://github.com/OWNER/REPO/pull/42
 /prism 42 save
+/prism 42 comment
 /prism 42 since
 /prism 42 since abc1234
 ```
@@ -106,3 +108,52 @@ Run PRism on your own branch to see the same page before a PR exists:
 - It writes `./.prism/branch-<branch>.html` and `./.prism/branch-<branch>-pr.md`, and the chat reply gives a ready `gh pr create ... --body-file` command. PRism never runs it; you do.
 
 You need to be in a git repo for author mode. Outside one, PRism asks for a PR number or link.
+
+## Share it on the PR
+
+Add `comment` to also write a PR comment to `./.prism/pr-<N>-comment.md`:
+
+```text
+/prism 42 comment
+```
+
+The comment has the title, PR type, before and after, the risk score with reasons, conflicts, the review path, the PR map as a Mermaid block that GitHub draws, and a collapsed list of modules and files. See [examples/comment-example.md](examples/comment-example.md) for the fake PR #42.
+
+Claude shows you the draft and asks before posting, because the comment is public under your name. If you say yes:
+
+- If the PR already has a PRism comment from your account (it starts with the hidden marker `<!-- prism -->`), Claude updates it. Comments by other people are never edited.
+- Otherwise Claude adds a new comment with `gh pr comment`.
+
+So each PR keeps one PRism comment, updated in place. The comment map is not clickable; the HTML page still is.
+
+## Post on every PR with GitHub Actions
+
+[examples/github-action/prism.yml](examples/github-action/prism.yml) runs PRism on every opened or updated PR with [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) and posts or updates the comment.
+
+Run these from the root of your repo. `PRISM` is where you have this PRism folder.
+
+1. Commit the skill to your repo's default branch:
+
+   ```bash
+   PRISM=path/to/prism
+   mkdir -p .claude/skills/prism
+   cp "$PRISM/SKILL.md" "$PRISM/template.html" .claude/skills/prism/
+   ```
+
+   It must be on the default branch: on PR runs the action loads `.claude/` from the base branch, not from the PR.
+2. Copy the workflow:
+
+   ```bash
+   mkdir -p .github/workflows
+   cp "$PRISM/examples/github-action/prism.yml" .github/workflows/prism.yml
+   ```
+
+3. Add your Anthropic API key as a repo secret named `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions).
+
+Notes:
+
+- The workflow passes `comment post` to the skill. `post` means "already approved", so it posts without asking. Only use `post` where you mean it.
+- The comment is posted by `github-actions[bot]` with the workflow token (`pull-requests: write`, `contents: read`). No Claude GitHub App is needed.
+- The HTML page is uploaded as a workflow artifact named `prism-pr-<N>`.
+- PRs from forks are skipped by the action by default, so they get no comment.
+- Each run uses your Anthropic API credits.

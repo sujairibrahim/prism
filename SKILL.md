@@ -1,7 +1,7 @@
 ---
 name: prism
 description: Use when the user runs /prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch.
-argument-hint: [<PR number or URL> [since [sha]] | branch [base=<name>] [+uncommitted]] [save]
+argument-hint: [<PR number or URL> [since [sha]] [comment [post]] | branch [base=<name>] [+uncommitted]] [save]
 ---
 
 # PRism 🔺
@@ -14,13 +14,16 @@ There are two modes:
 
 ## 1. Parse the input
 
-Input: $ARGUMENTS (for example `/prism 23`, `/prism https://github.com/OWNER/REPO/pull/23`, `/prism 23 since`, `/prism`, or `/prism branch base=develop`). Options can come in any order after the PR or `branch`: `since [sha]`, `base=<name>`, `+uncommitted`, `save`.
+Input: $ARGUMENTS (for example `/prism 23`, `/prism https://github.com/OWNER/REPO/pull/23`, `/prism 23 since`, `/prism`, or `/prism branch base=develop`). Options can come in any order after the PR or `branch`: `since [sha]`, `comment`, `post`, `base=<name>`, `+uncommitted`, `save`.
 
 **A PR number or URL was given → PR mode:**
 
 - If the user gave a number, use that number in the current repo.
 - If the user gave a URL like `https://github.com/OWNER/REPO/pull/123`, use repo `OWNER/REPO` and number `123`. Pass `--repo OWNER/REPO` to every `gh` command.
 - If the input has `since` after the PR (for example `/prism 42 since` or `/prism 42 since abc1234`), turn on **since mode** (step 3). `since` alone means "since my last review". `since <sha>` means "since this commit".
+- `save` — keep the page in `prism-output/` (step 9).
+- `comment` — also write a Markdown comment for the PR (step 10) and offer to post it (steps 11–12). It always describes the full PR: if the input has both `since` and `comment`, ignore `comment` and say so in the reply.
+- `post` — only with `comment`: the user already said yes to posting, so post without asking. Use it only when the word `post` is literally in the input (typed by the user or set in their GitHub workflow). Never assume it.
 - First run `gh auth status`. If it fails, stop and tell the user to run `gh auth login`.
 - Check if the current folder is a local clone of the PR's repo. Run `gh repo view --json nameWithOwner -q .nameWithOwner`. It is local if that prints the PR's `OWNER/REPO` (ignore case), or if `git remote -v` lists `OWNER/REPO` (for forks). If the command fails (no git repo) or names a different repo, it is **not local**. Remember this for step 7.
 
@@ -64,7 +67,7 @@ Skim the diff so you can say what each module does. If the diff is huge (about 2
    ```
 
    `--numstat` prints `adds<TAB>dels<TAB>path`. Binary files show `-` for both; count them as 0. Renames show as `old => new`.
-5. **Uncommitted changes — the rule:** by default, leave them out of everything (map, risk, description). The last command above counts them; if it is more than 0, show a chip and say it in chat (see steps 9 and 10). Include them only if the input has `+uncommitted` or the user asks in chat to include uncommitted or working changes. Then use these instead of the two `git diff` lines above:
+5. **Uncommitted changes — the rule:** by default, leave them out of everything (map, risk, description). The last command above counts them; if it is more than 0, show a chip and say it in chat (see steps 9 and 11). Include them only if the input has `+uncommitted` or the user asks in chat to include uncommitted or working changes. Then use these instead of the two `git diff` lines above:
 
    ```bash
    git diff --merge-base --numstat <baseRef>
@@ -303,7 +306,7 @@ flowchart TB
 
 ## 9. Write the HTML file
 
-1. Read `template.html` from the skill folder, usually `~/.claude/skills/prism/template.html`.
+1. Read `template.html` from the skill folder (the folder this SKILL.md is in), usually `~/.claude/skills/prism/template.html`, or `.claude/skills/prism/template.html` in the project.
 2. Replace these placeholders exactly:
    - `{{TITLE}}` — PR number and title. Example: `#42 Add JWT login`. Author mode: the suggested PR title, no number. Example: `Add JWT login`
    - `{{PR_URL}}` — the PR `url` from step 2, as plain text. Example: `https://github.com/acme/api/pull/42`. The page uses it to link every file to its diff on GitHub. If it is missing or wrong, files show as plain text. Author mode: an empty string (there is no PR to link to yet).
@@ -459,7 +462,7 @@ flowchart TB
      ```
 
      Copy each hash exactly from the output. Never guess a hash. If you cannot run the command, leave `url` out. The page computes the same hash in the browser and uses it when it can; your `url` is the fallback for browsers that cannot, and the plain `<PR url>/files` page is the last fallback. Auto-generated files get a `url` too.
-   - `{{PR_DESCRIPTION}}` — PR mode: replace with an empty string. Author mode: a suggested PR title and a Markdown body with four sections: `## What`, `## Why`, `## How to test`, `## Risk notes`. Base it on the commits, the diff, and your risk and conflict findings. If the reason is not clear from commits or code, write `_TODO: add the reason_` under Why. Keep the title short and free of `"`, `` ` ``, `$`, and `\` so the `gh` command in step 10 is safe to paste. In the HTML, escape `&`, `<`, and `>` in the title and body (`&amp;`, `&lt;`, `&gt;`). The Copy buttons already work; do not add script.
+   - `{{PR_DESCRIPTION}}` — PR mode: replace with an empty string. Author mode: a suggested PR title and a Markdown body with four sections: `## What`, `## Why`, `## How to test`, `## Risk notes`. Base it on the commits, the diff, and your risk and conflict findings. If the reason is not clear from commits or code, write `_TODO: add the reason_` under Why. Keep the title short and free of `"`, `` ` ``, `$`, and `\` so the `gh` command in step 11 is safe to paste. In the HTML, escape `&`, `<`, and `>` in the title and body (`&amp;`, `&lt;`, `&gt;`). The Copy buttons already work; do not add script.
 
      ```html
      <section class="card pr-desc-card">
@@ -489,7 +492,42 @@ flowchart TB
    - **Since mode:** name the file `pr-<N>-since-<shortsha>.html` in the same folder, where `<shortsha>` is the first 7 characters of the starting commit. Example: `./.prism/pr-42-since-abc1234.html`. A fallback page shows the full PR, so it uses the normal `pr-<N>.html` name.
 4. Do NOT open the file or a browser yourself. Never run `open`, `xdg-open`, or `start`. Never run `gh pr create` or `git push`. The user decides where to view it and when to open the PR.
 
-## 10. Reply in chat
+## 10. Write the PR comment (only with `comment`)
+
+Skip steps 10 and 12 if the input has no `comment`. Author mode has no PR, so it never writes a comment.
+
+Write `./.prism/pr-<N>-comment.md` (same `.prism/` folder and git exclude as step 9, even with `save`). Reuse what you already worked out; do not re-fetch. Use GitHub Markdown, no HTML except the marker and `<details>`. Fill it in this order:
+
+1. First line exactly: `<!-- prism -->` (a hidden marker so the comment can be found and updated later).
+2. `## 🔺 PRism: #<N> <title>`
+3. One line with the PR type in bold, the branches in backticks, and the line counts. Example: **New feature** · `feature/jwt-login` → `main` · real code +201 / -6 · total +281 / -6. Drop the total part if no files were muted.
+4. Before and after as two separate paragraphs: `**Before:** ...` and `**After:** ...`.
+5. `### 🔥 Risk: <score>/10 (<Low|Medium|High>)`, then one `-` bullet per rule that scored, with its points, as on the page.
+6. `### ⚠️ Conflicts`, then the same findings as `{{CONFLICTS}}`, without HTML: real conflicts first (with files), then clean overlaps, then one italic line that says how it was checked (`_Checked with git merge-tree._` or `_File overlap only: <reason>._`).
+7. `### 🧭 Review path`, then a numbered list, one line each: `1. **module** — why look here.`
+8. `### 🗺️ PR map`, then the diagram from step 6 in a fenced code block whose first line is three backticks and `mermaid`. Here fences are required, so GitHub draws the map. Change it for GitHub:
+   - Delete every `click ...` line. GitHub does not run `click ... call` callbacks.
+   - Keep `classDef`, `class`, `linkStyle`, subgraphs, and `==>` / `-.->` / `-.-` arrows.
+   - Do not add, remove, or reorder any arrow, so the `linkStyle` link numbers still match.
+9. A collapsed file list:
+
+   ```markdown
+   <details>
+   <summary>📁 Modules and files (6 modules, 6 files)</summary>
+
+   | Module | File | Status | +/- |
+   |---|---|---|---|
+   | ① users migration | `db/users_migration.sql` | 🔥 risky | +40/-0 |
+
+   </details>
+   ```
+
+   One row per file: review path modules first, in path order (with ① ② ③), then the rest, generated last. Keep the blank line after `</summary>` or the table will not render.
+10. Last line: `<sub>Generated by PRism for commit <first 7 of headRefOid>. Re-run /prism <N> comment to update.</sub>`
+
+Checks before saving: no `{{` left, no `click` line in the Mermaid block, and the file is under 60,000 characters (GitHub's limit is 65,536). If it is too long, shorten the file table to modules only.
+
+## 11. Reply in chat
 
 Reply with only:
 
@@ -516,4 +554,40 @@ In since mode, change lines 2 and 3:
 
    If `git rev-parse --abbrev-ref --symbolic-full-name @{u}` fails (the branch is not pushed yet), put `git push -u origin <branch>` on the line before it. Only show these commands; never run them yourself.
 
+If you wrote a comment (step 10), add after the link:
+
+5. The draft path as a Markdown link, like `[📝 PR comment draft](file:///absolute/path/.prism/pr-<N>-comment.md)`.
+6. A short preview in a `markdown` code block: the title line, the type line, the risk heading, and the review path. Not the Mermaid or the file table.
+7. Without `post`, ask: "Post this as a comment on PR #<N>? Everyone who can see the PR will see it." Then stop and wait. Posting publishes on the user's behalf, so only a clear yes counts. With `post`, skip the question and go to step 12.
+
 Do not paste the Mermaid or a long report in chat.
+
+## 12. Post the comment (only after a yes, or with `post`)
+
+If the user says no, do nothing more. Tell them the draft stays at the path above and they can post it later with `/prism <N> comment`.
+
+On yes:
+
+1. Get the repo: use `OWNER/REPO` from the URL, or run `gh repo view --json nameWithOwner -q .nameWithOwner`.
+2. Look for an existing PRism comment posted by this same account. Never edit a comment someone else wrote, even if it has the marker.
+   - Get your login with `gh api user --jq .login`. If that fails (it does in GitHub Actions), use `github-actions[bot]`.
+   - Then run, with that login in place of `LOGIN`:
+
+   ```bash
+   gh api repos/OWNER/REPO/issues/<N>/comments --paginate --jq '.[] | select(.user.login == "LOGIN") | select(.body | startswith("<!-- prism -->")) | .id'
+   ```
+
+3. If it prints an id, update that comment (use the first id if there are several):
+
+   ```bash
+   gh api -X PATCH repos/OWNER/REPO/issues/comments/<ID> -F body=@.prism/pr-<N>-comment.md --jq .html_url
+   ```
+
+4. If it prints nothing, add a new comment:
+
+   ```bash
+   gh pr comment <N> --repo OWNER/REPO --body-file .prism/pr-<N>-comment.md
+   ```
+
+5. If the update fails (for example 403 or 404), fall back to item 4 once. Do not retry more.
+6. Reply with one line: "Updated" or "Posted" plus the comment link (both commands print it).
