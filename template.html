@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
+      --font-sans: "Outfit", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       --bg: #070b14;
       --card: rgba(16, 24, 39, 0.78);
       --border: rgba(148, 163, 184, 0.16);
@@ -34,6 +36,12 @@
       --warn-border: rgba(251, 191, 36, 0.35);
       --ok-fg: #a7f3d0;
       --ok-border: rgba(52, 211, 153, 0.3);
+      --real-fg: #fecaca;
+      --real-bg: rgba(239, 68, 68, 0.12);
+      --real-border: rgba(239, 68, 68, 0.55);
+      --overlap-fg: #cbd5e1;
+      --overlap-bg: rgba(148, 163, 184, 0.07);
+      --overlap-border: rgba(245, 158, 11, 0.45);
       --surface: #0b1220;
       --stage-bg: #0a101c;
       --stage-dot: rgba(148, 163, 184, 0.12);
@@ -64,6 +72,12 @@
       --pill-breaking-bg: #b91c1c;
       --tooltip-bg: #0b1220;
       --tooltip-fg: #f8fafc;
+      --note-fg: #cbd5e1;
+      --note-bg: rgba(148, 163, 184, 0.1);
+      --note-border: rgba(148, 163, 184, 0.35);
+      --since-fg: #a5f3fc;
+      --since-bg: rgba(34, 211, 238, 0.1);
+      --since-border: rgba(34, 211, 238, 0.4);
     }
 
     :root[data-theme="light"] {
@@ -91,6 +105,12 @@
       --warn-border: rgba(217, 119, 6, 0.35);
       --ok-fg: #065f46;
       --ok-border: rgba(5, 150, 105, 0.3);
+      --real-fg: #991b1b;
+      --real-bg: rgba(239, 68, 68, 0.08);
+      --real-border: rgba(220, 38, 38, 0.45);
+      --overlap-fg: #334155;
+      --overlap-bg: rgba(100, 116, 139, 0.06);
+      --overlap-border: rgba(217, 119, 6, 0.5);
       --surface: #ffffff;
       --stage-bg: #e8edf5;
       --stage-dot: rgba(15, 23, 42, 0.1);
@@ -121,6 +141,12 @@
       --pill-breaking-bg: #fca5a5;
       --tooltip-bg: #0f172a;
       --tooltip-fg: #f8fafc;
+      --note-fg: #475569;
+      --note-bg: rgba(71, 85, 105, 0.08);
+      --note-border: rgba(71, 85, 105, 0.3);
+      --since-fg: #155e75;
+      --since-bg: rgba(14, 116, 144, 0.08);
+      --since-border: rgba(14, 116, 144, 0.35);
     }
 
     @media (prefers-color-scheme: light) {
@@ -149,6 +175,12 @@
         --warn-border: rgba(217, 119, 6, 0.35);
         --ok-fg: #065f46;
         --ok-border: rgba(5, 150, 105, 0.3);
+        --real-fg: #991b1b;
+        --real-bg: rgba(239, 68, 68, 0.08);
+        --real-border: rgba(220, 38, 38, 0.45);
+        --overlap-fg: #334155;
+        --overlap-bg: rgba(100, 116, 139, 0.06);
+        --overlap-border: rgba(217, 119, 6, 0.5);
         --surface: #ffffff;
         --stage-bg: #e8edf5;
         --stage-dot: rgba(15, 23, 42, 0.1);
@@ -179,6 +211,12 @@
         --pill-breaking-bg: #fca5a5;
         --tooltip-bg: #0f172a;
         --tooltip-fg: #f8fafc;
+        --note-fg: #475569;
+        --note-bg: rgba(71, 85, 105, 0.08);
+        --note-border: rgba(71, 85, 105, 0.3);
+        --since-fg: #155e75;
+        --since-bg: rgba(14, 116, 144, 0.08);
+        --since-border: rgba(14, 116, 144, 0.35);
       }
     }
 
@@ -189,7 +227,7 @@
       min-height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: "Outfit", system-ui, sans-serif;
+      font-family: var(--font-sans);
       line-height: 1.5;
     }
 
@@ -282,7 +320,7 @@
       border: 1px solid var(--border);
       background: var(--chip-bg);
       color: var(--text);
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
 
@@ -290,6 +328,7 @@
     .chip-state.open { border-color: rgba(52, 211, 153, 0.45); color: var(--ok); background: var(--ok-bg); }
     .chip-state.merged { border-color: var(--merged-border); color: var(--merged-fg); background: var(--merged-bg); }
     .chip-state.closed { border-color: var(--closed-border); color: var(--closed-fg); background: var(--closed-bg); }
+    .chip-state.draft { border-color: var(--warn-border); color: var(--warn-fg); background: var(--warn-bg); }
 
     .brief-card {
       margin-bottom: 16px;
@@ -306,7 +345,7 @@
       padding: 5px 11px;
       border-radius: 999px;
       border: 1px solid transparent;
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 600;
     }
@@ -374,6 +413,37 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
     }
     .affected-empty { margin: 0; color: var(--muted); font-size: 13px; }
+    .affected-note {
+      flex-basis: 100%;
+      margin: 2px 0 0;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--note-border);
+      background: var(--note-bg);
+      color: var(--note-fg);
+      font-size: 12px;
+    }
+
+    .since-banner {
+      margin-bottom: 16px;
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: 1px solid var(--since-border);
+      background: var(--since-bg);
+      color: var(--since-fg);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px 12px;
+    }
+    .since-banner strong { font-weight: 600; color: var(--text); }
+    .since-banner span { font-size: 13px; }
+    .since-banner code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.92em; }
+    .since-banner.is-fallback {
+      border-color: var(--warn-border);
+      background: var(--warn-bg);
+      color: var(--warn-fg);
+    }
 
 
     .grid-top {
@@ -412,11 +482,25 @@
     .conflicts-card { padding: 0; overflow: hidden; }
     .conflicts-card h2 { padding: 20px 22px 0; }
 
+    .conflicts-real,
+    .conflicts-overlap,
     .conflicts-warn,
     .conflicts-ok {
       margin: 0 12px 12px;
       padding: 14px 16px;
       border-radius: 12px;
+    }
+
+    .conflicts-real {
+      background: var(--real-bg);
+      border: 1px solid var(--real-border);
+      color: var(--real-fg);
+    }
+
+    .conflicts-overlap {
+      background: var(--overlap-bg);
+      border: 1px dashed var(--overlap-border);
+      color: var(--overlap-fg);
     }
 
     .conflicts-warn {
@@ -431,8 +515,17 @@
       color: var(--ok-fg);
     }
 
+    .conflicts-real ul,
+    .conflicts-overlap ul,
     .conflicts-warn ul,
     .conflicts-ok ul { margin: 8px 0 0; padding-left: 18px; }
+    .conflicts-head { margin: 0; font-weight: 600; }
+    .conflicts-note {
+      margin: 0 12px 12px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
 
     .risk-meter { display: flex; flex-direction: column; gap: 12px; }
     .risk-head { display: flex; align-items: baseline; gap: 6px; }
@@ -484,6 +577,49 @@
     }
     .review-steps strong { display: block; font-weight: 600; }
     .review-steps p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    .pr-desc-card { margin-bottom: 16px; }
+    .pr-desc-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 6px;
+    }
+    .pr-desc-label { color: var(--muted); font-size: 12px; font-weight: 600; }
+    .pr-desc-title,
+    .pr-desc-body {
+      margin: 0 0 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: var(--stage-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .pr-desc-title { font-weight: 600; }
+    .pr-desc-body {
+      margin-bottom: 0;
+      max-height: 420px;
+      overflow: auto;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .copy-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
 
     .diagram-card { margin-bottom: 16px; padding: 20px 22px 16px; }
     .diagram-head {
@@ -551,6 +687,32 @@
       stroke-width: 3px !important;
     }
 
+    .map-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 40px 16px;
+      text-align: center;
+    }
+    .map-fallback p { margin: 0; }
+    .map-fallback-msg { color: var(--warn-fg); font-weight: 600; }
+    .map-fallback-hint { color: var(--muted); font-size: 13px; }
+    .map-fallback-nodes { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .map-fallback-nodes button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 5px 11px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .map-fallback-nodes button:hover,
+    .map-fallback-nodes button.is-selected { border-color: var(--accent); color: var(--accent); }
+
     .file-panel {
       border-radius: 14px;
       background: var(--stage-bg);
@@ -580,17 +742,58 @@
       font-size: 13px;
     }
     .file-list .path {
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       word-break: break-all;
     }
     .file-list .pm {
-      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-family: var(--font-mono);
       font-size: 11px;
       color: var(--muted);
       white-space: nowrap;
     }
     .file-list li.is-generated { opacity: 0.7; color: var(--muted); }
+
+    .diff-link {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px dotted var(--muted);
+    }
+    .diff-link:hover,
+    .diff-link:focus-visible { color: var(--accent); border-bottom-color: var(--accent); }
+    .diff-link:focus-visible,
+    .step-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+    .file-list a.path::after {
+      content: "\2197";
+      margin-left: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .file-list a.path:hover::after { color: var(--accent); }
+
+    .step-open {
+      appearance: none;
+      border: 0;
+      border-bottom: 1px dotted var(--muted);
+      background: none;
+      padding: 0;
+      font: inherit;
+      font-weight: 600;
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .step-open:hover { color: var(--accent); border-bottom-color: var(--accent); }
+    .step-diff {
+      margin-left: 8px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent);
+      border-bottom-color: transparent;
+      white-space: nowrap;
+    }
+    .step-diff:hover { border-bottom-color: var(--accent); }
 
     .legend-list {
       display: flex;
@@ -633,6 +836,12 @@
       outline: 1px dashed #ef4444;
       outline-offset: 2px;
     }
+    .swatch.overlap {
+      background: #1c1917;
+      border-color: #f59e0b;
+      outline: 1px dashed #f59e0b;
+      outline-offset: 2px;
+    }
     .swatch.path {
       width: 16px;
       height: 0;
@@ -662,7 +871,7 @@
   </script>
 </head>
 <body>
-  <div class="page">
+  <div class="page" id="prism-page" data-pr-url="{{PR_URL}}">
     <header class="hero">
       <div>
         <div class="brand"><span class="mark" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Zm8.5 8a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0ZM5 12.5A1.5 1.5 0 1 1 2 12.5a1.5 1.5 0 0 1 3 0ZM3.5 5v6.1c.15.07.29.16.44.26A2.99 2.99 0 0 1 6 10.5V8.75h5.25A2.75 2.75 0 0 1 14 6V5.12a1.5 1.5 0 1 0-1 0V6A1.75 1.75 0 0 0 11.25 7.75H6V5.5c.15-.07.3-.16.44-.26A2.99 2.99 0 0 0 8.5 3.5h.12a1.5 1.5 0 1 0 0-1H8.5A3.99 3.99 0 0 1 5 5.12V5Z"/></svg></span> PRism</div>
@@ -671,6 +880,8 @@
       </div>
       <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch theme">☀️</button>
     </header>
+
+    {{SINCE_BANNER}}
 
     <section class="card brief-card">
       {{BEFORE_AFTER}}
@@ -698,6 +909,8 @@
       <h2>Review path 🧭</h2>
       {{REVIEW_PATH}}
     </section>
+
+    {{PR_DESCRIPTION}}
 
     <section class="card diagram-card">
       <div class="diagram-head">
@@ -735,6 +948,7 @@
         <li><span class="swatch risky"></span> 🔥 risky</li>
         <li><span class="swatch generated"></span> 🤖 auto-generated</li>
         <li><span class="swatch conflict"></span> ⚠️ conflict with another PR</li>
+        <li><span class="swatch overlap"></span> 🔀 overlap, merges cleanly</li>
         <li><span class="swatch path"></span> 🧭 review path</li>
       </ul>
     </section>
@@ -743,8 +957,65 @@
   </div>
 
   <script type="application/json" id="prism-files">{{FILES_JSON}}</script>
+  <script>
+    (function () {
+      function selectText(el) {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      function flash(btn, text) {
+        if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+        btn.textContent = text;
+        clearTimeout(btn._prismTimer);
+        btn._prismTimer = setTimeout(function () { btn.textContent = btn.dataset.label; }, 2000);
+      }
+      function fallbackCopy(btn, el) {
+        selectText(el);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        if (ok) {
+          window.getSelection().removeAllRanges();
+          flash(btn, "Copied");
+        } else {
+          var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+          flash(btn, mac ? "Press ⌘C" : "Press Ctrl+C");
+        }
+      }
+      document.addEventListener("click", function (event) {
+        var btn = event.target.closest && event.target.closest("[data-copy]");
+        if (!btn) return;
+        var el = document.getElementById(btn.getAttribute("data-copy"));
+        if (!el) return;
+        var text = el.textContent;
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(
+            function () { flash(btn, "Copied"); },
+            function () { fallbackCopy(btn, el); }
+          );
+        } else {
+          fallbackCopy(btn, el);
+        }
+      });
+    })();
+  </script>
   <script type="module">
-    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    // Mermaid loads from a CDN. It is imported lazily so the rest of the page
+    // (theme, zoom, file panel) still works when it cannot load.
+    const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    const OFFLINE_MSG = "The PR map needs an internet connection to load Mermaid.";
+    const RENDER_ERROR_MSG = "The PR map could not be drawn because the Mermaid code on this page has an error.";
+    let mermaidPromise = null;
+
+    function loadMermaid() {
+      if (!mermaidPromise) {
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Mermaid load timed out")), 15000));
+        mermaidPromise = Promise.race([import(MERMAID_URL), timeout]).then((mod) => mod.default);
+      }
+      return mermaidPromise;
+    }
 
     const STATUS_EMOJI = {
       added: "🟢",
@@ -766,6 +1037,60 @@
     const panelTitle = document.getElementById("file-panel-title");
     const panelEmpty = document.getElementById("file-panel-empty");
     const panelList = document.getElementById("file-panel-list");
+    const filePanel = document.getElementById("file-panel");
+
+    // Diff links. GitHub anchors each file on /pull/N/files as #diff-<sha256 of the path>.
+    // Without a valid PR URL, files stay plain text.
+    const PR_URL = (() => {
+      const raw = ((document.getElementById("prism-page") || {}).dataset || {}).prUrl || "";
+      const m = raw.trim().match(/^https?:\/\/[^\/\s]+\/[^\/\s]+\/[^\/\s]+\/pull\/\d+/);
+      return m ? m[0] : "";
+    })();
+    const FILES_URL = PR_URL ? PR_URL + "/files" : "";
+    const hashCache = new Map();
+
+    function esc(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function sha256Hex(text) {
+      if (!hashCache.has(text)) {
+        const subtle = window.crypto && window.crypto.subtle;
+        hashCache.set(text, !subtle ? Promise.resolve("") :
+          subtle.digest("SHA-256", new TextEncoder().encode(text))
+            .then((buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join(""))
+            .catch(() => ""));
+      }
+      return hashCache.get(text);
+    }
+
+    function isGenerated(file) {
+      return !!file.generated || file.status === "generated";
+    }
+
+    function isLinkable(file) {
+      return !!FILES_URL && !file.isLabel && String(file.path || "").trim() !== "";
+    }
+
+    // Start with the precomputed url (if it is well formed) or the plain files page,
+    // then swap in the hash the browser computes from the path, which cannot drift.
+    function startUrl(file) {
+      const url = typeof file.url === "string" ? file.url.trim() : "";
+      return url.startsWith(FILES_URL + "#diff-") && /#diff-[0-9a-f]{64}$/.test(url) ? url : FILES_URL;
+    }
+
+    function upgradeLinks(root) {
+      if (!root) return;
+      root.querySelectorAll("a[data-diff-path]").forEach((a) => {
+        sha256Hex(a.dataset.diffPath).then((hex) => {
+          if (hex) a.href = FILES_URL + "#diff-" + hex;
+        });
+      });
+    }
 
     function nodeKeyFromEl(el) {
       const title = el.querySelector("title");
@@ -782,6 +1107,9 @@
       const data = FILES[id];
       document.querySelectorAll(".diagram-inner .node").forEach((n) => {
         n.classList.toggle("is-selected", nodeKeyFromEl(n) === id);
+      });
+      document.querySelectorAll(".map-fallback-nodes button").forEach((b) => {
+        b.classList.toggle("is-selected", b.dataset.node === id);
       });
       if (!data) {
         panelTitle.textContent = id || "Files";
@@ -803,14 +1131,62 @@
       panelEmpty.hidden = true;
       panelList.hidden = false;
       panelList.innerHTML = files.map((file) => {
-        const generated = !!file.generated || file.status === "generated";
+        const generated = isGenerated(file);
         const emoji = STATUS_EMOJI[file.status] || (generated ? "🤖" : "🟡");
-        const path = String(file.path || "").replace(/</g, "&lt;");
-        const add = file.add == null ? 0 : file.add;
-        const del = file.del == null ? 0 : file.del;
-        return `<li class="${generated ? "is-generated" : ""}"><span>${emoji}</span><span class="path">${path}</span><span class="pm">+${add} / -${del}</span></li>`;
+        const rawPath = String(file.path || "");
+        const path = isLinkable(file)
+          ? `<a class="path diff-link" href="${esc(startUrl(file))}" data-diff-path="${esc(rawPath)}" target="_blank" rel="noopener" title="Open this file's diff on GitHub">${esc(rawPath)}</a>`
+          : `<span class="path">${esc(rawPath)}</span>`;
+        const add = esc(file.add == null ? 0 : file.add);
+        const del = esc(file.del == null ? 0 : file.del);
+        return `<li class="${generated ? "is-generated" : ""}"><span>${emoji}</span>${path}<span class="pm">+${add} / -${del}</span></li>`;
       }).join("");
+      upgradeLinks(panelList);
     };
+
+    // Review path: the module name opens its files panel, and "diff ↗" opens its first file on GitHub.
+    function nodeForStep(li) {
+      const id = (li.dataset.node || "").trim();
+      if (id && FILES[id]) return id;
+      const strong = li.querySelector("strong");
+      const name = strong ? strong.textContent.trim().toLowerCase() : "";
+      return Object.keys(FILES).find((key) => String((FILES[key] || {}).label || "").trim().toLowerCase() === name) || "";
+    }
+
+    function firstLinkableFile(id) {
+      const files = FILES[id] && Array.isArray(FILES[id].files) ? FILES[id].files : [];
+      return files.find((f) => isLinkable(f) && !isGenerated(f)) || files.find(isLinkable) || null;
+    }
+
+    document.querySelectorAll(".review-steps li").forEach((li) => {
+      const strong = li.querySelector("strong");
+      const id = nodeForStep(li);
+      if (!strong || !id) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "step-open";
+      btn.textContent = strong.textContent.trim();
+      btn.title = "Show this module's files";
+      btn.addEventListener("click", () => {
+        window.showNode(id);
+        filePanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+      strong.textContent = "";
+      strong.appendChild(btn);
+      const file = firstLinkableFile(id);
+      if (file) {
+        const a = document.createElement("a");
+        a.className = "diff-link step-diff";
+        a.href = startUrl(file);
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.dataset.diffPath = String(file.path);
+        a.title = "Open " + file.path + " diff on GitHub";
+        a.textContent = "diff ↗";
+        strong.append(" ", a);
+      }
+    });
+    upgradeLinks(document.querySelector(".review-steps"));
 
     const mermaidSource = (document.querySelector("#diagram-inner pre.mermaid") || {}).textContent || "";
     let selectedId = null;
@@ -837,7 +1213,7 @@
           clusterBkg: "#0f172a",
           clusterBorder: "#334155",
           titleColor: "#94a3b8",
-          fontFamily: "Outfit, system-ui, sans-serif",
+          fontFamily: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
           fontSize: "16px"
         } : {
           darkMode: false,
@@ -847,7 +1223,7 @@
           clusterBkg: "#f1f5f9",
           clusterBorder: "#cbd5e1",
           titleColor: "#475569",
-          fontFamily: "Outfit, system-ui, sans-serif",
+          fontFamily: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
           fontSize: "16px"
         },
         flowchart: {
@@ -883,11 +1259,54 @@
       });
     }
 
+    function showMapFallback(message) {
+      inner.innerHTML = "";
+      const box = document.createElement("div");
+      box.className = "map-fallback";
+      const msg = document.createElement("p");
+      msg.className = "map-fallback-msg";
+      msg.textContent = message;
+      box.appendChild(msg);
+      const ids = Object.keys(FILES);
+      if (ids.length) {
+        const hint = document.createElement("p");
+        hint.className = "map-fallback-hint";
+        hint.textContent = "You can still open each module's files:";
+        const list = document.createElement("div");
+        list.className = "map-fallback-nodes";
+        ids.forEach((id) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.node = id;
+          btn.textContent = (FILES[id] && FILES[id].label) || id;
+          btn.addEventListener("click", () => window.showNode(id));
+          list.appendChild(btn);
+        });
+        box.append(hint, list);
+      }
+      inner.appendChild(box);
+      if (selectedId) window.showNode(selectedId);
+    }
+
     async function renderDiagram() {
-      mermaid.initialize(mermaidOptions());
-      inner.innerHTML = '<pre class="mermaid"></pre>';
-      inner.querySelector("pre.mermaid").textContent = mermaidSource;
-      await mermaid.run();
+      let mermaid;
+      try {
+        mermaid = await loadMermaid();
+      } catch (err) {
+        console.warn("PRism: could not load Mermaid", err);
+        showMapFallback(OFFLINE_MSG);
+        return;
+      }
+      try {
+        mermaid.initialize(mermaidOptions());
+        inner.innerHTML = '<pre class="mermaid"></pre>';
+        inner.querySelector("pre.mermaid").textContent = mermaidSource;
+        await mermaid.run();
+      } catch (err) {
+        console.error("PRism: could not draw the PR map", err);
+        showMapFallback(RENDER_ERROR_MSG);
+        return;
+      }
       bindNodeClicks();
       if (selectedId) window.showNode(selectedId);
     }

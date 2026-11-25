@@ -1,0 +1,76 @@
+# PRism: post a PR map comment on every opened or updated pull request.
+#
+# Setup (see README.md, "Post on every PR with GitHub Actions"):
+#   1. Copy this file to .github/workflows/prism.yml
+#   2. Add the PRism folder as .claude/skills/prism/ and commit it to your default branch.
+#      On pull_request runs the action restores .claude/ from the base branch,
+#      so a skill added only in a PR branch is not used.
+#   3. Add the repo secret ANTHROPIC_API_KEY (Settings > Secrets and variables > Actions).
+#
+# Uses anthropics/claude-code-action@v1. Inputs below were checked against the
+# action's action.yml and docs (docs/usage.md, docs/solutions.md, docs/security.md).
+# Notes on what could not be verified are marked "UNVERIFIED".
+
+name: PRism
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read        # read the repo and the skill files
+  pull-requests: write  # create or update the PRism comment on the PR
+  # id-token: write     # only if you remove github_token below and use the Claude GitHub App (OIDC) instead
+
+# One run per PR at a time. A new push cancels the old run, so the comment is never written twice at once.
+concurrency:
+  group: prism-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  prism:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Full history, so prism_collect.py can run the real conflict check (git merge-tree).
+          # With a shallow clone it falls back to file overlap only.
+          fetch-depth: 0
+
+      - name: Run PRism
+        uses: anthropics/claude-code-action@v1
+        env:
+          # UNVERIFIED: the docs do not say whether the action exports GH_TOKEN to Claude's
+          # Bash tool. Setting it here makes sure `gh` is logged in with the workflow token.
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Use the workflow token, so the Claude GitHub App is not required.
+          # The comment is then posted by github-actions[bot].
+          github_token: ${{ github.token }}
+          # A prompt runs the action in automation mode (no @claude mention needed).
+          # `post` tells the skill the repo owner already approved posting, so it does not ask.
+          prompt: |
+            Read .claude/skills/prism/SKILL.md and follow it exactly.
+            The skill folder is .claude/skills/prism/, so run python3 .claude/skills/prism/prism_collect.py.
+            The arguments are: ${{ github.event.pull_request.number }} comment post
+            The repo is ${{ github.repository }}. Pass --repo ${{ github.repository }} to gh commands.
+            This is a CI run. Nobody will read a chat reply, so keep it to one line with the comment link.
+          # Tools the skill needs. File tools (Read, Write, Glob, Grep) are listed too.
+          # `gh api:*` is needed to find and PATCH the existing PRism comment; it also allows
+          # other API calls, limited by the permissions block above.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Write,Glob,Grep,Bash(gh auth status:*),Bash(gh repo view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(git rev-parse:*),Bash(git grep:*),Bash(mkdir:*),Bash(rg:*),Bash(grep:*),Bash(python3 .claude/skills/prism/prism_collect.py:*)"
+
+      # Optional: keep the full HTML page as a downloadable workflow artifact.
+      - name: Upload PRism page
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-pr-${{ github.event.pull_request.number }}
+          path: .prism/
+          include-hidden-files: true
+          if-no-files-found: ignore
