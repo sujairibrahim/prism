@@ -16,7 +16,7 @@ Open an [issue](../../issues/new/choose) and pick a form. For a bug, include the
    - If you changed `template.html`, update `example.html` the same way and open it in a browser.
 4. Open a pull request into `main` and fill in the short checklist.
 
-All changes go through a pull request. `main` is protected, and the maintainer reviews and merges each PR.
+All changes go through a pull request. `main` is protected: the maintainer is the code owner (see `.github/CODEOWNERS`), so each PR needs their approval before it can be merged.
 
 ## Keep it simple
 
