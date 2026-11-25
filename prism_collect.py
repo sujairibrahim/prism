@@ -698,6 +698,8 @@ def run_real_check(conflicts, repo, base_ref, head_ref, fetch_specs, base_label)
             o["kind"] = "conflict" if shared else "overlap"
             o["conflict_files"] = shared
         conflicts["method"] = "merge-tree"
+        order = {"conflict": 0, "potential": 1, "overlap": 2}
+        conflicts["overlaps"].sort(key=lambda o: (o["generated_only"], order[o["kind"]], -len(o["files"])))
         return True
     finally:
         drop_prism_refs()
