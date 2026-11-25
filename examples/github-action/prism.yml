@@ -2,7 +2,7 @@
 #
 # Setup (see README.md, "Post on every PR with GitHub Actions"):
 #   1. Copy this file to .github/workflows/prism.yml
-#   2. Commit SKILL.md, template.html, and prism_collect.py to .claude/skills/prism/ on your default branch.
+#   2. Add the PRism folder as .claude/skills/prism/ and commit it to your default branch.
 #      On pull_request runs the action restores .claude/ from the base branch,
 #      so a skill added only in a PR branch is not used.
 #   3. Add the repo secret ANTHROPIC_API_KEY (Settings > Secrets and variables > Actions).

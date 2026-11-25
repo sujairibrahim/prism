@@ -1,93 +1,62 @@
 # PRism 🔺
 
-PRism turns a GitHub pull request into a visual HTML page, so you can see what the PR does at a glance. It also works on your own branch before you open a PR.
-
-The page includes:
-
-- A short summary
-- The PR type (new feature, bug fix, and so on)
-- Before and after
-- Affected features
-- A risk meter from 1 to 10
-- A suggested review path — each step opens its module's files or jumps to its diff
-- Real conflict check against the base branch and other open PRs: real conflicts and clean overlaps are shown apart
-- A Mermaid PR map — click a module to see its files
-- Every file links straight to its diff on GitHub
-- Auto-generated files, shown muted on the map
-- Re-review mode: only what changed since your last review
-- A suggested PR description, in author mode
-- Light and dark mode
-- Optional: a Markdown comment posted on the PR, so the whole team sees the same map
-
-It can also rank every open PR waiting on your review, so you know which one to open first.
-
-Counting lines, muting generated files, grouping modules, checking conflicts, and scoring risk are done by a small script, `prism_collect.py`. So the numbers are the same every run, and big PRs stay fast. Claude reads the code and writes the words.
+See what a pull request does at a glance. PRism turns a GitHub PR, or your own branch before you open one, into a visual page: a summary, a risk score, the order to review in, real conflicts with other PRs, and a clickable map of the changed modules.
 
 ![Example PRism page for fake PR #42 Add JWT login](example-page.png)
 
 ## Install
 
-You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in, and Python 3 (standard library only).
-
-For the real conflict check, run `/prism` inside a full (not shallow) local clone of the PR's repo, with git 2.38 or newer. PRism fetches PR heads into private `refs/prism/*` refs, runs `git merge-tree`, and deletes those refs again. It never checks out a branch or touches your working tree. Anywhere else, it falls back to file overlap only and says so on the page.
-
-Copy these four files into your Claude Code skills folder:
+You need [Claude Code](https://claude.com/claude-code), the [GitHub CLI](https://cli.github.com/) (`gh`, logged in), and Python 3.
 
 ```bash
-mkdir -p ~/.claude/skills/prism
-cp SKILL.md template.html queue-template.html prism_collect.py ~/.claude/skills/prism/
+git clone https://github.com/sujairibrahim/prism ~/.claude/skills/prism
 ```
 
-## Usage
+To update later, run `git -C ~/.claude/skills/prism pull`.
 
-In Claude Code, run:
+## Use it
 
-```text
-/prism <PR number or URL> [since [sha]] [comment] [save]
-/prism [branch] [base=<name>] [+uncommitted] [save]
-```
+| Type this in Claude Code | What you get |
+| --- | --- |
+| `/prism 42` | A map of PR 42. A PR link works too. |
+| `/prism` | A map of your current branch, before you open a PR, with a suggested PR description. |
+| `/prism 42 since` | Only what changed since your last review. |
+| `/prism 42 comment` | The map posted as a comment on the PR, so your team sees it. Claude asks before posting. |
+| `/prism queue` | The PRs waiting on your review, riskiest first. |
 
-Examples:
+Claude replies with a link to the page. Pages go to a hidden `.prism/` folder that git ignores. Add `save` to any command to keep the page in `prism-output/` instead.
 
-```text
-/prism 42
-/prism https://github.com/OWNER/REPO/pull/42
-/prism 42 save
-/prism 42 comment
-/prism 42 since
-/prism 42 since abc1234
-```
+## What's on the page
 
-By default, the page is written to `./.prism/pr-<N>.html` and kept out of git. Add `save` to write it to `./prism-output/` instead.
+- What the PR does, before and after, and which existing features it touches
+- A risk score from 1 to 10, with the reasons
+- A review path: which modules to read first, and why
+- Conflicts with the base branch and other open PRs. Real conflicts and clean overlaps are shown apart.
+- A map of the changed modules. Click one to see its files, and click a file to open its diff on GitHub.
+- Lockfiles and other generated files, muted so they don't distract
+- Light and dark mode
 
-### Re-review: only what changed
+## Good to know
 
-Add `since` to see only the changes since your last review on the PR. Add `since <sha>` to see the changes since a given commit. A banner at the top shows the starting commit and how many new commits there are. The map, modules, risk, and review path cover only the new changes, and a muted chip shows the full-PR totals. The page is written to `pr-<N>-since-<shortsha>.html`.
+- **Run it from a local clone of the repo** for the best results. PRism can then check real merge conflicts and find code that calls the changed code. Anywhere else it still works, and the page says what it could not check. It never checks out a branch or changes your files.
+- **The map needs internet** to load. Offline, the rest of the page still works.
+- **Nothing is posted without your OK.** `comment` shows you the draft first.
 
-If you never reviewed the PR, or your review commit is gone after a force-push or rebase, PRism says so and shows the full PR. GitHub lists at most 300 changed files for this view.
+<details>
+<summary><strong>More options</strong></summary>
 
-Open the page in a browser, or copy the `open` command from the chat reply.
+- `/prism 42 since abc1234` — changes since a given commit, instead of since your last review. If the commit is gone (after a force-push or rebase), PRism shows the full PR and says why.
+- `/prism branch base=develop` — compare your branch with a different base branch. By default PRism uses the repo's default branch.
+- `/prism branch +uncommitted` — include changes you have not committed yet. By default only commits are included, and PRism tells you how many files are uncommitted.
+- `/prism queue all` — PRs waiting on you across every repo, not just this one.
+- In author mode the reply includes a ready `gh pr create` command for you to run. PRism never runs it.
 
-The page loads Mermaid (for the PR map) and its fonts from a CDN, so it needs an internet connection. Offline, the PR map shows a short message instead, and the rest of the page still works: the summary, risk meter, review path, and a list of modules you can click to see their files. Fonts fall back to your system fonts.
+</details>
 
-For the best "Affected features" check, run `/prism` from a local clone of the PR's repo. Otherwise PRism cannot search for callers, so it reads affected features from the diff only and says so on the page.
+<details>
+<summary><strong>How the risk score works</strong></summary>
 
-### Review queue
-
-```text
-/prism queue
-/prism queue all
-```
-
-`/prism queue` ranks the open PRs in the current repo that are waiting on your review (including review requests to your teams). `/prism queue all` does the same across every repo.
-
-Each PR gets a quick risk score from its file paths and line counts. No diffs are read, so it stays fast. Shared files between PRs in the queue count as a conflict risk. The page shows the score, title, repo, author, age, size, a draft badge, the top reasons, and a `/prism` command to copy for a deep dive.
-
-The page is written to `./.prism/queue.html`. With more than 15 PRs across all repos, PRs are scored on size alone.
-
-## How the risk score works
-
-The score starts at 1. PRism adds or subtracts points using only file paths and line counts. "Lines" means real lines changed (adds + dels), not counting auto-generated files.
+The score starts at 1. "Lines" means lines changed, not counting generated files.
 
 | Rule | Points |
 | --- | --- |
@@ -98,101 +67,53 @@ The score starts at 1. PRism adds or subtracts points using only file paths and 
 | Migration that changes or drops existing data | +2 |
 | Config or CI changes | +1 |
 | Dependency manifest changes | +1 |
-| Size of real code: 300-999 / 1000-2999 / 3000+ lines | +1 / +2 / +3 |
+| Size: 300-999 / 1000-2999 / 3000+ lines | +1 / +2 / +3 |
 | No tests changed (skipped for docs/config-only or under 20 lines) | +2 |
-| Tests changed but thin (under a quarter of the other real lines) | +1 |
+| Tests changed but thin (under a quarter of the other lines) | +1 |
 | Tests changed alongside sensitive code or a migration, and not thin | −1 |
-| Real conflict with the base branch or another open PR (or GitHub says it already conflicts) | +2 |
-| Otherwise, only a clean overlap: another open PR touches the same files but merges cleanly | +1 |
+| Real conflict with the base branch or another open PR | +2 |
+| Otherwise, another open PR touches the same files but merges cleanly | +1 |
 
-The score is capped at 10. The lowest score is 1, or 2 when sensitive code or a migration changed. Levels: 1-3 low, 4-6 medium, 7-10 high. The page lists each rule that scored, with its points.
+The score is capped at 10. It is at least 2 when sensitive code or a migration changed. 1-3 is low, 4-6 medium, 7-10 high.
 
-## Author mode: before you open a PR
+A small script, `prism_collect.py`, does all the counting and scoring, so the numbers are the same every run. Claude reads the code and writes the words.
 
-Run PRism on your own branch to see the same page before a PR exists:
+</details>
 
-```text
-/prism
-/prism branch
-/prism branch base=develop
-/prism branch +uncommitted
-```
+<details>
+<summary><strong>Post on every PR automatically (GitHub Actions)</strong></summary>
 
-- If your current branch already has an open PR, PRism uses that PR.
-- Otherwise it compares your branch with the base branch (`origin/HEAD`, else `main`, else `master`, or `base=<name>`). You don't need `gh` for this; without it, PRism skips the check for overlapping open PRs.
-- Only committed work is included. Uncommitted changes are counted and mentioned. Add `+uncommitted` to include them.
-- The page shows a "Draft (no PR yet)" chip and a suggested PR title and description with Copy buttons.
-- It writes `./.prism/branch-<branch>.html` and `./.prism/branch-<branch>-pr.md`, and the chat reply gives a ready `gh pr create ... --body-file` command. PRism never runs it; you do.
+[examples/github-action/prism.yml](examples/github-action/prism.yml) runs PRism on every opened or updated PR and posts or updates one PRism comment. See [examples/comment-example.md](examples/comment-example.md) for what the comment looks like.
 
-You need to be in a git repo for author mode. Outside one, PRism asks for a PR number or link.
-
-## Share it on the PR
-
-Add `comment` to also write a PR comment to `./.prism/pr-<N>-comment.md`:
-
-```text
-/prism 42 comment
-```
-
-The comment has the title, PR type, before and after, the risk score with reasons, conflicts, the review path, the PR map as a Mermaid block that GitHub draws, and a collapsed list of modules and files. See [examples/comment-example.md](examples/comment-example.md) for the fake PR #42.
-
-Claude shows you the draft and asks before posting, because the comment is public under your name. If you say yes:
-
-- If the PR already has a PRism comment from your account (it starts with the hidden marker `<!-- prism -->`), Claude updates it. Comments by other people are never edited.
-- Otherwise Claude adds a new comment with `gh pr comment`.
-
-So each PR keeps one PRism comment, updated in place. The comment map is not clickable; the HTML page still is.
-
-## Post on every PR with GitHub Actions
-
-[examples/github-action/prism.yml](examples/github-action/prism.yml) runs PRism on every opened or updated PR with [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) and posts or updates the comment.
-
-Run these from the root of your repo. `PRISM` is where you have this PRism folder.
-
-1. Commit the skill to your repo's default branch:
+1. In your repo, add PRism to `.claude/skills/prism/` and commit it to the default branch:
 
    ```bash
-   PRISM=path/to/prism
-   mkdir -p .claude/skills/prism
-   cp "$PRISM/SKILL.md" "$PRISM/template.html" "$PRISM/queue-template.html" "$PRISM/prism_collect.py" .claude/skills/prism/
+   git clone --depth 1 https://github.com/sujairibrahim/prism .claude/skills/prism && rm -rf .claude/skills/prism/.git
    ```
 
-   It must be on the default branch: on PR runs the action loads `.claude/` from the base branch, not from the PR.
-2. Copy the workflow:
+2. Copy the workflow to `.github/workflows/prism.yml`:
 
    ```bash
-   mkdir -p .github/workflows
-   cp "$PRISM/examples/github-action/prism.yml" .github/workflows/prism.yml
+   mkdir -p .github/workflows && cp .claude/skills/prism/examples/github-action/prism.yml .github/workflows/
    ```
 
 3. Add your Anthropic API key as a repo secret named `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions).
 
-Notes:
+The comment is posted by `github-actions[bot]`. PRs from forks are skipped. Each run uses your Anthropic API credits.
 
-- The workflow passes `comment post` to the skill. `post` means "already approved", so it posts without asking. Only use `post` where you mean it.
-- The comment is posted by `github-actions[bot]` with the workflow token (`pull-requests: write`, `contents: read`). No Claude GitHub App is needed.
-- The HTML page is uploaded as a workflow artifact named `prism-pr-<N>`.
-- PRs from forks are skipped by the action by default, so they get no comment.
-- Each run uses your Anthropic API credits.
+</details>
 
-## The collector script
+<details>
+<summary><strong>Run the script on its own</strong></summary>
 
-You can also run the script on its own. It prints one JSON object with the PR details, every file and its flags, the map modules, totals, tests, conflicts, and the risk score with reasons:
+`prism_collect.py` prints the PR facts as JSON: files, modules, totals, tests, conflicts, and the risk score with reasons.
 
 ```bash
 python3 ~/.claude/skills/prism/prism_collect.py 42
-python3 ~/.claude/skills/prism/prism_collect.py https://github.com/OWNER/REPO/pull/42
 python3 ~/.claude/skills/prism/prism_collect.py 42 --since last
-python3 ~/.claude/skills/prism/prism_collect.py --branch --base develop --uncommitted
+python3 ~/.claude/skills/prism/prism_collect.py --branch
 ```
 
-Options:
+Run it with `--help` for all options.
 
-- `--since SHA` or `--since last` — only what changed since a commit, or since your last review.
-- `--branch` — author mode: your current branch against its base. Add `--base NAME` and `--uncommitted` as needed.
-- `--save FILE` — write the full JSON to a file and print a shorter view.
-- `--no-overlaps` — skip the open-PR check. `--no-real-check` — skip `git merge-tree` and use file overlap only.
-- `--max-nodes N` — change the map size (default 10).
-- `--fill-files PAGE FILE` — put the saved file list into a page's `{{FILES_JSON}}`.
-
-If `gh` is missing or not logged in, it prints an error JSON and exits with code 2 or 3.
+</details>

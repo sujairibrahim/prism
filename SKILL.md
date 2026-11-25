@@ -1,7 +1,7 @@
 ---
 name: prism
 description: Use when the user runs /prism <PR number or URL>, runs /prism or /prism branch to preview their current branch before a PR exists, or asks to explain, visualize, or map a GitHub pull request or their own branch. Also use for /prism queue, or when the user asks which PRs are waiting on their review.
-argument-hint: [<PR number or URL> [since [sha]] [comment [post]] | branch [base=<name>] [+uncommitted] | queue [all]] [save]
+argument-hint: [PR number or link | queue] [since | comment] [save]
 ---
 
 # PRism 🔺
@@ -461,24 +461,20 @@ Checks before saving: no `{{` left, no `click` line in the Mermaid block, and th
 
 ## 11. Reply in chat
 
-Reply with only:
+Keep it short. Reply with only:
 
-1. One line: what the PR does.
-2. One line: main modules changed, with real-code +adds / -dels (and total if generated files were muted).
-3. One line: risk score and conflict status (real conflicts, clean overlaps, or "file overlap only" with the reason).
-4. A clickable link to the page, as a Markdown link with the absolute path, like `[🔺 Open PR #<N> map](file:///absolute/path/pr-<N>.html)`. Use the real absolute path of the file you wrote (use `pwd`). If it is the temporary copy, add: "Temporary view in `.prism/` (ignored by git). Run `/prism <N> save` to keep it in `prism-output/`." On the next line, also print the plain absolute path so it can be copied into any browser or editor preview. Then add one more line with a command the user can copy to open it, in a code block: `open <absolute path>` on macOS (`xdg-open` on Linux, `start` on Windows). Only show this command; never run it yourself.
+1. One line: what the PR does, in plain words.
+2. One line: the risk score and level, then the conflict status in a few words (for example "7/10 high. Conflicts with PR 38." or "3/10 low. No conflicts.").
+3. A clickable link to the page: `[🔺 Open PR #<N> map](file:///absolute/path/pr-<N>.html)`, using the real absolute path of the file you wrote. Then the command to open it, in a code block: `open <absolute path>` on macOS (`xdg-open` on Linux, `start` on Windows). Only show this command; never run it yourself.
 
-In since mode, change lines 2 and 3:
+If the page is the temporary copy, you may add one short line: "Add `save` to keep it."
 
-- Line 2: "Since your review on <date> (commit abc1234): 3 new commits, 5 files changed, real code +40 / -12." For `since <sha>`, say "Since commit abc1234".
-- Line 3: the delta risk score and level, then conflict status. Example: "Delta risk 4/10 medium. No conflicts found."
-- In the save hint, use `/prism <N> since <shortsha> save`.
-- On a fallback, start the reply with why (never reviewed, or force-push/rebase) and say the page shows the full PR.
+In since mode, line 1 says what changed since the review: "Since your review on <date>: 3 new commits, 5 files changed." (For `since <sha>`, "Since commit abc1234".) Line 2 gives the delta risk. On a fallback, start with why (never reviewed, or force-push/rebase) and say the page shows the full PR.
 
-**Author mode** — the same four lines (say "this branch" instead of "the PR"; link text `[🔺 Open branch <branch> map](file:///absolute/path/branch-<name>.html)`; the save hint is `/prism branch save`), then:
+**Author mode** — the same three lines (say "this branch" instead of "the PR"; link text `[🔺 Open branch <branch> map](file:///absolute/path/branch-<name>.html)`), then:
 
-5. If uncommitted files were left out: "<count> uncommitted files are not included. Commit them, or run `/prism branch +uncommitted` to preview them." If they were included: "Includes <count> uncommitted files. Commit them before you open the PR."
-6. "Ready to open the PR? Run:" and a code block with this command, using the same folder as the page:
+4. Only if uncommitted files were left out: "<count> uncommitted files are not included." If they were included: "Includes <count> uncommitted files. Commit them before you open the PR."
+5. "Ready to open the PR? Run:" and a code block with this command, using the same folder as the page:
 
    ```bash
    gh pr create --base <base> --title "<suggested title>" --body-file ./.prism/branch-<name>-pr.md
@@ -488,9 +484,9 @@ In since mode, change lines 2 and 3:
 
 If you wrote a comment (step 10), add after the link:
 
-5. The draft path as a Markdown link, like `[📝 PR comment draft](file:///absolute/path/.prism/pr-<N>-comment.md)`.
-6. A short preview in a `markdown` code block: the title line, the type line, the risk heading, and the review path. Not the Mermaid or the file table.
-7. Without `post`, ask: "Post this as a comment on PR #<N>? Everyone who can see the PR will see it." Then stop and wait. Posting publishes on the user's behalf, so only a clear yes counts. With `post`, skip the question and go to step 12.
+4. The draft path as a Markdown link, like `[📝 PR comment draft](file:///absolute/path/.prism/pr-<N>-comment.md)`.
+5. A short preview in a `markdown` code block: the title line, the type line, the risk heading, and the review path. Not the Mermaid or the file table.
+6. Without `post`, ask: "Post this as a comment on PR #<N>? Everyone who can see the PR will see it." Then stop and wait. Posting publishes on the user's behalf, so only a clear yes counts. With `post`, skip the question and go to step 12.
 
 Do not paste the Mermaid or a long report in chat.
 
@@ -661,6 +657,6 @@ Reply with only:
 
 1. One line: how many PRs are waiting, and for which repo (or all repos).
 2. The top 3, one line each: `1. #42 Add JWT login (owner/repo) — 9/10 high: touches auth, shares auth.py with #38`. Fewer if there are fewer.
-3. The page link, the plain absolute path, and the `open` command in a code block, the same way as step 11. Then: `Run /prism <N> for a full deep dive.`
+3. The page link and the `open` command in a code block, the same way as step 11. Then: `Run /prism <N> for a full deep dive.`
 
 If the queue is empty, reply with one line, `Nothing waiting on your review in owner/repo. ☕`, then the page link.
