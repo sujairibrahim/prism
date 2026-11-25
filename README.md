@@ -117,3 +117,11 @@ python3 ~/.claude/skills/prism/prism_collect.py --branch
 Run it with `--help` for all options.
 
 </details>
+
+## Contributing
+
+Bug reports, ideas, and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)

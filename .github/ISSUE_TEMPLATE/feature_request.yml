@@ -1,0 +1,16 @@
+name: Idea
+description: Suggest something that would make PRism more useful.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Tell us what you were trying to do.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: PRism aims to stay simple, so smart defaults beat new options.

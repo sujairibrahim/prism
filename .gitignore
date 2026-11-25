@@ -1,0 +1,13 @@
+# PRism output when you test it in this repo
+.prism/
+prism-output/
+
+# Python
+__pycache__/
+*.pyc
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# OS files
+.DS_Store
