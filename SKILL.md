@@ -43,168 +43,98 @@ Input: $ARGUMENTS (for example `/prism 23`, `/prism https://github.com/OWNER/REP
    If it prints a number, this branch already has an open PR: use PR mode with that number.
 5. Otherwise (no PR, only a merged or closed one, or `gh` is missing or not logged in), use **author mode**. In author mode `gh` is optional; only the open-PR conflict check needs it. The repo is always local in author mode, and `since` does not apply.
 
-## 2. Fetch the data
+## 2. Collect the facts with the script
 
-PR mode: run
+The script `prism_collect.py` (in the skill folder, next to this file) does the counting, grouping, conflict check, and risk score. Its numbers are the source of truth. Do not recount lines, regroup files, or redo the risk math yourself.
 
-```bash
-gh pr view <N> --json number,title,body,author,state,baseRefName,headRefName,headRefOid,files,commits,additions,deletions,mergeable,mergedAt,url
-gh pr diff <N>
-```
+1. Run it. `<tmp>` is `"${TMPDIR:-/tmp}/prism-<N>.json"` (use `prism-branch.json` in author mode).
+   - PR mode: `python3 ~/.claude/skills/prism/prism_collect.py <N or URL exactly as given> --save <tmp>`
+   - Since mode: add `--since last` (for `since` alone) or `--since <sha>`.
+   - Author mode: `python3 ~/.claude/skills/prism/prism_collect.py --branch --save <tmp>`, plus `--base <name>` for `base=<name>` and `--uncommitted` for `+uncommitted` (or when the user asks in chat to include uncommitted or working changes).
 
-Skim the diff so you can say what each module does. If the diff is huge (about 2000+ lines or 40+ files), use `gh pr diff <N> --name-only`, then read only the important files: risky files first, then the largest modules.
-
-### Author mode
-
-1. **Base name.** If the input has `base=<name>`, use it. Otherwise run `git symbolic-ref --short refs/remotes/origin/HEAD`; it prints something like `origin/main`, so drop the `origin/` part. If that fails, use `main` if `git rev-parse --verify --quiet main` succeeds, else `master` the same way. If none works, ask for `/prism branch base=<name>` and stop.
-2. **Base ref** (what git compares against). If `git rev-parse --verify --quiet origin/<base>` succeeds, use `origin/<base>`; otherwise use `<base>`. Below this is `<baseRef>`. Do not run `git fetch` here.
-3. If the current branch is the base, or `git rev-list --count <baseRef>..HEAD` prints `0` and there is nothing uncommitted to include, say there is nothing to compare yet and stop.
-4. Fetch committed work (three dots in `diff`, two in `log`). If the diff is huge, use `git diff --name-only <baseRef>...HEAD` and read only the important files, as above.
-
-   ```bash
-   git log --format='%h %an %s' <baseRef>..HEAD
-   git diff --numstat <baseRef>...HEAD
-   git diff <baseRef>...HEAD
-   git status --porcelain | wc -l
-   ```
-
-   `--numstat` prints `adds<TAB>dels<TAB>path`. Binary files show `-` for both; count them as 0. Renames show as `old => new`.
-5. **Uncommitted changes — the rule:** by default, leave them out of everything (map, risk, description). The last command above counts them; if it is more than 0, show a chip and say it in chat (see steps 9 and 11). Include them only if the input has `+uncommitted` or the user asks in chat to include uncommitted or working changes. Then use these instead of the two `git diff` lines above:
-
-   ```bash
-   git diff --merge-base --numstat <baseRef>
-   git diff --merge-base <baseRef>
-   git ls-files --others --exclude-standard
-   ```
-
-   The first two compare the base with your working tree (staged and unstaged). The last one lists new untracked files; treat each as added, with its line count from `wc -l < <file>`.
-6. **Labels.** Repo: `gh repo view --json nameWithOwner --jq .nameWithOwner` if `gh` works, else the folder name of `git rev-parse --show-toplevel`. Author: `git config user.name`.
-7. **File name.** Make a safe branch name for files: `printf '%s' "<branch>" | tr -c 'A-Za-z0-9._-' '-'` (for example `feature/jwt-login` becomes `feature-jwt-login`). Below this is `<name>`.
+   Use the skill folder you are reading this from; in a project it may be `.claude/skills/prism/`.
+2. If it exits non-zero, stop and tell the user its `message`. Exit 2: install `gh`. Exit 3: run `gh auth login`. Exit 4: wrong input (bad PR number or link, not a git repo, no base branch, or nothing to compare). Exit 5: `gh` or `git` failed.
+3. It prints one short JSON object (long file lists are cut to 10, with the rest counted in `files_more`; the saved file has everything):
+   - `pr` — `mode` (`pr`, `since`, or `branch`), repo, number, title, url, author, state, base, head, mergeable, body, commits. Author mode adds `base_ref`, `safe_name` (the branch name made safe for file names), `commit_count`, `uncommitted_files`, `includes_uncommitted`, and `pushed`.
+   - `since` — only when `--since` was given. See step 3.
+   - `totals.real` and `totals.all` — files, additions, deletions for real code and for all files. `totals.generated` is the muted part. Since mode adds `totals.full_pr` and `totals.full_pr_real`.
+   - `tests` — `present`, `thin`, `needed`, and line counts.
+   - `conflicts` — see step 4.
+   - `risk` — `score`, `level`, `percent`, and `reasons` (points and why, biggest first).
+   - `modules` — the map nodes: `id`, `label`, `status`, `mermaid_class`, `node_label`, `on_review_path`, `files`.
+   - `read_plan` — `big`, `important_files`, `risky_files`.
+   - Saved file only: `files` (every file with its flags) and `files_json` (ready for `{{FILES_JSON}}`, with a GitHub diff `url` per file in PR and since mode).
+4. Read the code so you can write the prose (what each module does). Skip generated files.
+   - If `read_plan.big` is `false`, read the whole diff: `gh pr diff <N>` in PR mode; the delta diff in since mode (step 3); `git diff <base_ref>...HEAD` in author mode (`git diff --merge-base <base_ref>` with uncommitted changes).
+   - If `read_plan.big` is `true` (about 2000+ real lines or 40+ real files), do not read the full diff. Read only the files in `read_plan.important_files` (risky first, then the largest), one at a time. PR mode: `gh api repos/OWNER/REPO/pulls/<N>/files --paginate --jq '.[] | select(.filename=="PATH") | .patch'`. Author mode: `git diff <base_ref>...HEAD -- PATH`.
 
 ## 3. Since mode (skip this step without `since`)
 
-Show only what changed since the user last looked. You need `OWNER/REPO`: take it from the URL, or run `gh repo view --json nameWithOwner --jq .nameWithOwner`.
+The script compares the commit you last reviewed (or the `<sha>` you gave) with the PR head and puts the result in `since`:
 
-1. **Find the starting commit.**
-   - `since <sha>`: use that sha. Skip to 2.
-   - `since` alone: find the user's latest submitted review.
+- `since.nothing_new` is `true`: nothing changed since then. Do not write a page. Reply: "No new commits on PR <N> since your review on <date> (commit abc1234)."
+- `since.fallback_reason` is set (you never reviewed it, or the old commit is gone after a force-push or rebase): the script used the full PR instead. Make the normal full-PR page with the fallback banner (step 9) that gives this reason, and say it first in chat.
+- Otherwise (`pr.mode` is `since`): every list and number in the JSON covers only the delta. `since.from_short` is the starting commit, `since.reviewed_at` the review time (write it like `24 Nov 2026`), `since.total_commits` the new commit count, `since.commits` their headlines. "Before" means at your review and "After" means now. Conflicts stay PR-wide, because a merge takes the whole PR.
+- If `since.files_capped` is `true`, add to the banner: "GitHub lists at most 300 files, so some may be missing." If `since.has_merge_commits` is `true`, say in the summary that the delta includes base-branch changes.
+- To read the delta diff: `gh api repos/OWNER/REPO/compare/<since.from>...<pr.head_oid> -H "Accept: application/vnd.github.diff"`.
 
-     ```bash
-     gh api user --jq .login
-     gh api repos/OWNER/REPO/pulls/<N>/reviews --paginate --jq '.[] | select(.user.login == "LOGIN" and .state != "PENDING") | "\(.commit_id) \(.submitted_at)"' | tail -n 1
-     ```
+## 4. Conflicts (from the script)
 
-     Reviews come oldest first, so the last line is the latest one. Any review counts (approved, changes requested, commented). It prints `<commit_id> <submitted_at>`. Write the date like `24 Nov 2026`.
-   - If it prints nothing, the user never reviewed this PR. Say so, then make the normal full-PR page (skip the rest of this step) with the fallback banner: "You have not reviewed this PR yet, so this shows the full PR."
-2. **Get the delta.** Do not add `--paginate`: GitHub only sends the file list on the first page.
+If `conflicts.checked` is `false`, the PR is merged or closed: say conflicts are already resolved or no longer apply.
 
-   ```bash
-   gh api repos/OWNER/REPO/compare/<since>...<headRefOid> --jq '{status, ahead_by, behind_by, total_commits, commits: [.commits[] | {sha: .sha[0:7], msg: (.commit.message | split("\n")[0])}], files: [.files[] | {filename, status, additions, deletions, previous_filename}]}'
-   gh api repos/OWNER/REPO/compare/<since>...<headRefOid> -H "Accept: application/vnd.github.diff"
-   ```
+Otherwise read `conflicts`:
 
-   The first gives the new commits and changed files. The second is the delta diff to skim instead of `gh pr diff`.
-3. **Check `status`.**
-   - `ahead` — good. Use the delta.
-   - `identical` — nothing new since the review. Do not write a page. Reply: "No new commits on PR <N> since your review on <date> (commit abc1234)."
-   - `diverged` or `behind`, or the call fails with `Not Found (HTTP 404)` — the old commit is no longer in the branch history, usually because of a force-push or rebase. Do not try to diff file by file: the old and new commits may sit on different bases, so the result would mix in base-branch changes. Make the normal full-PR page with the fallback banner: "Commit abc1234 is no longer in this branch (likely a force-push or rebase), so this shows the full PR."
-4. **Limits.** `files` holds at most 300 files. If you get exactly 300, add to the banner: "GitHub lists at most 300 files, so some may be missing." Use `total_commits` for the commit count, not the length of `commits`. If a new commit is a merge from the base branch (like "Merge branch 'main'"), say in the summary that the delta includes base-branch changes.
-5. **Use the delta in the next steps.** Group, classify, risk, review path, map, before/after, affected features, summary, and `{{FILES_JSON}}` use only the delta files and delta diff. Compare file status `removed` is 🔴 deleted, and `renamed` is 🟡 modified. "Before" means at your review and "After" means now. Conflicts stay PR-wide (step 4), because a merge takes the whole PR.
+- `method` is `merge-tree` — the **real check** ran. The script fetched the base and the PR heads into private `refs/prism/*` refs, ran `git merge-tree` for this PR against the base and against each open PR that shares files, and deleted those refs again. It never checks out, touches the working tree, or changes the user's branches. It runs only in a full (not shallow) local clone of the PR's repo, with git 2.38 or newer.
+- `method` is `file-overlap` — the fallback. `fallback_reason` says why in one short phrase (for example "not run in a local clone of OWNER/REPO", "git is older than 2.38", "shallow clone", or "git fetch failed"). The page must say it is file overlap only and why.
+- `base_conflict` and `base_conflict_files` — this PR (or branch) conflicts with the base. In the fallback this is GitHub's `mergeable` = `CONFLICTING`.
+- `overlaps` — other open PRs on the same base that touch the same `files`. Each has a `kind`:
+  - `conflict` — a real conflict; `conflict_files` lists the clashing files (only files both PRs change).
+  - `overlap` — same files, merges cleanly.
+  - `potential` — file overlap only (fallback, or the check failed for that pair).
+  - `generated_only: true` means they share only generated files such as a lockfile. Mention it briefly; it adds no risk.
+  - `other_out_of_date: true` — add "PR M is also out of date with <base>".
+- `error` — the open-PR part could not run (for example `gh` is missing in author mode). Say so in the note.
 
-## 4. Conflict check
+In author mode the base check runs locally against `<base_ref>` with no network, so it is only as fresh as the user's last fetch. Say "this branch" instead of "this PR".
 
-If the PR is **merged** or **closed**: say conflicts are already resolved or no longer apply, and skip this step.
+## 5. How the script groups and classifies files
 
-If the PR is **open**:
+This is a summary of what `prism_collect.py` does, so you can explain it. Do not apply it by hand. If this text and the script ever disagree, the script wins.
 
-1. Run `gh pr list --base <baseRefName> --state open --limit 100 --json number,title,headRefName,files,mergeable`. Drop this PR from the list.
-2. Find other open PRs that touch the same files. Call these the **sharing PRs**, and note the shared files for each.
-3. Decide if you can run a **real check**. All of these must be true:
-   - `gh repo view --json nameWithOwner -q .nameWithOwner` prints the PR's `OWNER/REPO` (ignore case). That means the current folder is a local clone of the PR's repo.
-   - `git version` is 2.38 or newer.
-   - `git rev-parse --is-shallow-repository` prints `false`.
-4. **Real check.** Never check out, never touch the working tree, and never change the user's branches. Use the remote whose URL contains `OWNER/REPO` in `git remote -v` (usually `origin`). Fetch the base and the PR heads into a private `refs/prism/` namespace, in one command (with no sharing PRs, fetch only the base and this PR):
+**Generated** (muted): lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `go.sum`, any `*.lock`, and similar), `*.snap`, snapshot data files (migration or schema snapshots), `*.min.*`, and files under `dist/`, `build/`, `generated/`, `__generated__/`, `vendor/`, or `__snapshots__/`. They all go in **one** node, `GEN`: `🤖 auto-generated N files +X/-Y`. It is not on the review path and its lines are not in the "real code" totals. `totals.all` still counts every file.
 
-   ```bash
-   git fetch --no-tags --quiet --no-write-fetch-head <remote> \
-     +refs/heads/<baseRefName>:refs/prism/base \
-     +pull/<N>/head:refs/prism/pr-<N> \
-     +pull/<M>/head:refs/prism/pr-<M>   # one line per sharing PR
-   ```
+**Classify** each real file:
+- 🟢 added · 🟡 modified (renamed counts as modified) · 🔴 deleted
+- 🧪 tests — files in folders like `test/`, `tests/`, `__tests__/`, `spec/`, `e2e/`, or named like `test_*.py`, `*_test.go`, `*.test.ts`, `*.spec.js`, `*Test.java`
+- 📦 dependencies — manifests like `package.json`, `requirements.txt`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `Gemfile` (lockfiles are generated, not this)
+- 🔥 risky — path words for auth, security, or permissions (`auth`, `login`, `oauth`, `jwt`, `session`, `token`, `secret`, `permission`), migrations or schema, config (`config`, `settings`, `.env`, `Dockerfile`, `*.tf`), CI (`.github/workflows/` and similar), payments. Tests, deps, docs, and generated files are never risky.
+- One status per file: generated, then tests, then deps, then deleted, then risky, then added or modified. So risky wins over added or modified, and tests stay 🧪.
 
-   Then run `git merge-tree`, once for this PR against the base, and once against each sharing PR:
-
-   ```bash
-   git merge-tree --write-tree --name-only --no-messages refs/prism/base refs/prism/pr-<N>
-   git merge-tree --write-tree --name-only --no-messages refs/prism/pr-<N> refs/prism/pr-<M>
-   ```
-
-   Read each result:
-   - **Exit 0**: merges cleanly. The output is one line, a tree id.
-   - **Exit 1, and the first line is a 40-character tree id**: real conflict. The lines after the tree id are the conflicted files.
-   - **Anything else** (for example exit 1 with no tree id for a bad ref, or exit 128 for unrelated histories): the check failed for that pair. Treat that pair as file overlap only.
-
-   Classify each sharing PR:
-   - **Real conflict**: merge-tree reports conflicted files. Keep only files in that PR's shared files, because an out-of-date PR can also report its own conflicts with the base. If none are left, call it clean overlap. If the sharing PR's `mergeable` is `CONFLICTING`, add "PR M is also out of date with <base>".
-   - **Overlap, merges cleanly**: same files, no conflict.
-
-   Against the base: conflicted files mean this PR conflicts with the base branch. This replaces `mergeable`, which can be stale or `UNKNOWN`.
-
-   Last, always delete the private refs, even if something failed:
-
-   ```bash
-   git for-each-ref --format='%(refname)' refs/prism/ | while read -r r; do git update-ref -d "$r"; done
-   ```
-
-5. **Fallback.** If any check in item 3 is not true, or the fetch fails, use file overlap only: every sharing PR is a **potential conflict**, and `mergeable` = `CONFLICTING` means this PR conflicts with the base. Note the reason in one short phrase, for example "not run in a local clone of OWNER/REPO", "git is older than 2.38", "shallow clone", or "git fetch failed". The page must say it is file overlap only and why.
-
-### Author mode
-
-1. **Against the base**, locally and with no network: `git merge-tree --write-tree --name-only --no-messages <baseRef> HEAD`. Read it the same way as above. If it fails in another way (for example git older than 2.38), skip it and say so in the note.
-2. **Against open PRs**, only if `gh` works: run the same `gh pr list`, with `--base <base>`, and find the sharing PRs. If the real-check conditions in item 3 hold, fetch only the sharing PR heads (`+pull/<M>/head:refs/prism/pr-<M>`), run `git merge-tree --write-tree --name-only --no-messages HEAD refs/prism/pr-<M>` for each, then delete the private refs as above. Otherwise use file overlap only. If `gh` is missing, not logged in, or the command fails, skip this and say so in the note (see `{{CONFLICTS}}` in step 9).
-
-## 5. Group files, mute noise, classify
-
-Split files into **real code** and **generated**.
-
-**Generated** (mute these): lockfiles, `*.lock`, `*.snap`, migration snapshots, schema snapshots, and files under `dist/`, `build/`, `generated/`, `__generated__/`, `vendor/`, plus `*.min.*`. Put all of them in **one** node: `🤖 auto-generated N files +X/-Y`. Do not put this node on the review path. Do not include its lines in the "real code" headline. Still show a "total +A/-B" chip that counts every file.
-
-**Overview map:** group the remaining real files by top-level folder or module. Keep the whole map to about **10-12 nodes** (branches and the generated node count toward this). Merge small leftover groups into `other N files`. The overview shows modules only, not individual files. Files belong in `{{FILES_JSON}}`, so a click can reveal them.
-
-**Classify** each real module:
-- 🟢 added · 🟡 modified · 🔴 deleted
-- 🧪 tests — test files or folders
-- 📦 dependencies — manifests like `package.json` or `requirements.txt` (lockfiles are generated, not this)
-- 🔥 risky — auth, security, migrations, config, CI, permissions, payments
-- Risky wins over added or modified. Tests stay 🧪.
+**Overview map:** all tests go in one `TESTS` node, all dependency manifests in one `DEPS` node, and generated files in `GEN`. The other real files are grouped by top-level folder. If there is room, the biggest folder is split one level deeper. If there are too many groups, the smallest go into `OTHER` (`other N files`). The whole map is capped at about **10 nodes**, counting `HEAD` and `BASE`; conflict nodes come on top. The map shows modules only; the files are in `files_json`, so a click can reveal them.
 
 ## 6. Risk, review path, and diagram
 
-**Risk meter 🔥** — start at 1 and add or subtract the points below. Use only file paths and line counts from step 2 (in since mode, the delta from step 3). "Lines" means real lines changed (adds + dels), with generated files left out.
+**Risk meter 🔥** — use `risk.score`, `risk.level`, `risk.percent`, and `risk.reasons` as they are. This is the rubric the script applies, from file paths, line counts, and the migration diffs. "Lines" means real lines changed (adds + dels), with generated files left out. In since mode it scores the delta only; the conflict points still count.
 
-1. **Sensitive code** (auth, permissions, security, payments). Count the lines changed in those files:
-   - under 50 lines: +1
-   - 50-199 lines: +2
-   - 200+ lines, or the PR adds a new login, token, or permission flow: +3
-2. **Migrations or schema** (real ones, not only a generated snapshot): +1 if they only add (new tables, columns, indexes); +2 if they change or drop existing data (`ALTER`, `DROP`, `RENAME`, backfills).
+1. **Sensitive code** (auth, permissions, security, payments). Lines changed in those files: under 50 = +1; 50-199 = +2; 200+, or a new login, token, or permission flow (a new sensitive file with 30+ added lines) = +3.
+2. **Migrations or schema** (real ones, not only a generated snapshot): +1 if they only add; +2 if the added lines change or drop existing data (`ALTER TABLE`, `DROP`, `RENAME`, `UPDATE ... SET`, `DELETE FROM`, and the same in ORM migrations), or a migration is deleted.
 3. **Config or CI**: +1
 4. **Dependency manifests**: +1
 5. **Size** of all real code: +1 for 300-999 lines, +2 for 1000-2999, +3 for 3000+.
-6. **Tests** (skip this rule for docs/config-only PRs and for code changes under 20 lines):
-   - no test files changed: +2
-   - tests changed but thin (test lines are under a quarter of the other real lines): +1
-   - tests changed alongside sensitive code or a migration, and not thin: −1
-7. **Conflicts** (count once, use the highest): +2 for a real conflict with the base branch or another open PR (step 4), or if `mergeable` is `CONFLICTING`; otherwise +1 if another open PR only overlaps (same files, merges cleanly). In the fallback (file overlap only): +2 if `mergeable` is `CONFLICTING`, otherwise +1 if another open PR touches the same files.
+6. **Tests** (skipped for docs/config-only changes and for code changes under 20 lines): no test files changed = +2; tests changed but thin (test lines under a quarter of the other real lines) = +1; tests changed alongside sensitive code or a migration, and not thin = −1.
+7. **Conflicts** (count once): +2 for a real conflict with the base branch or another open PR (in the fallback: GitHub says `CONFLICTING`); otherwise +1 if another open PR touches the same real files (clean overlap, or file overlap only in the fallback).
 
 Then cap at 10. The lowest score is 1, or 2 if sensitive code or a migration changed. Level: 1-3 low, 4-6 medium, 7-10 high.
 
-In since mode, score the delta only (sizes, tests, and sensitive files from the new changes); the conflict points still count, because a merge takes the whole PR.
+Write one short plain reason per item in `risk.reasons`, with its points, biggest first (for example `New JWT login flow +3`). Do not add reasons the script did not give.
 
-Give one short reason per rule that scored, with its points, biggest first (for example `New JWT login flow +3`). Leave out rules that scored 0.
+**Review path 🧭** — pick the order a reviewer should read the `modules`, usually: data/schema → core logic → API → clients → tests/docs. Skip modules with `on_review_path: false` (the generated node), branch nodes, conflict nodes, and overlap nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
 
-**Review path 🧭** — pick the order a reviewer should read the modules, usually: data/schema → core logic → API → clients → tests/docs. Skip the generated node, branch nodes, conflict nodes, and overlap nodes. Number the path modules ① ② ③ in their labels. Draw the path with thick arrows `==>` in that order, then color those arrows cyan with `linkStyle` (link index starts at 0, in the order links appear; the example below shows this). For each step, write one plain line that says why to look there.
+**Diagram** — use one node per entry in `modules`. Keep each module's `id` exactly as the node id, so `files_json` and the clicks match. Start from its `node_label` (`emoji label +adds/-dels`): you may shorten or rename the label text into plain words and add ① ② ③, but keep the emoji and the +/- numbers. Use `mermaid_class` in the `class` lines. Prefer `flowchart TB` so the review path reads top to bottom. Use a subgraph for the path, in order. Use fewer edges and fewer crossings. If you cannot infer flow, link `HEAD` to the first review node and to side nodes only. Other PRs from `conflicts.overlaps` (skip `generated_only` ones; if there are many, show the 2-3 with the most shared files):
+- `kind` `conflict` or `potential` — class `conflict`, label `⚠️ PR 38 title`, linked `AUTH -.-> C38`.
+- `kind` `overlap` — class `overlap`, label `🔀 PR 40 title`, linked without an arrowhead `USER -.- O40`.
 
-**Diagram** — prefer `flowchart TB` so the review path reads top to bottom. Use a subgraph for the path, in order. Keep labels short: `① emoji module +adds/-dels`. Use fewer edges and fewer crossings. If you cannot infer flow, link `HEAD` to the first review node and to side nodes only. Other PRs: a real conflict is a node with class `conflict`, label `⚠️ PR 38 title`, linked `AUTH -.-> C38`. A clean overlap is a node with class `overlap`, label `🔀 PR 40 title`, linked without an arrowhead `USER -.- O40`. In the fallback, draw every sharing PR as `conflict`. Link each one from the module that holds the shared files. After every module node (including generated), add `click ID call showNode("ID")`.
+Link each one from the module that holds the shared files. After every module node (including generated), add `click ID call showNode("ID")`.
 
 **Colors** — always include these `classDef` rules:
 
@@ -259,10 +189,10 @@ flowchart TB
     DB["① 🔥 users migration +40/-0"]
     AUTH["② 🔥 auth +80/-0"]
     USER["③ 🟡 user service +24/-6"]
-    TEST["④ 🧪 test_auth +55/-0"]
+    TESTS["④ 🧪 tests +55/-0"]
     DB ==> AUTH
     AUTH ==> USER
-    USER ==> TEST
+    USER ==> TESTS
   end
 
   DEPS["📦 requirements.txt +2/-0"]
@@ -279,7 +209,7 @@ flowchart TB
   click DB call showNode("DB")
   click AUTH call showNode("AUTH")
   click USER call showNode("USER")
-  click TEST call showNode("TEST")
+  click TESTS call showNode("TESTS")
   click DEPS call showNode("DEPS")
   click GEN call showNode("GEN")
 
@@ -297,7 +227,7 @@ flowchart TB
   class HEAD,BASE branch
   class DB,AUTH risky
   class USER modified
-  class TEST tests
+  class TESTS tests
   class DEPS deps
   class GEN generated
   class C38 conflict
@@ -325,9 +255,9 @@ flowchart TB
      <span class="chip chip-muted">total +281 / -6</span>
      ```
 
-     State chip: `chip chip-state open`, `merged`, or `closed`.
+     State chip: `chip chip-state open`, `merged`, or `closed`. Take "real code" from `totals.real` and "total" from `totals.all`.
 
-     Author mode: no PR number chip. Use `by <git user.name>`, local branch names, and the draft state chip. Add a commit count chip, and an uncommitted chip when the count from step 2 is more than 0:
+     Author mode: no PR number chip. Use `by <git user.name>`, local branch names, and the draft state chip. Add a commit count chip (`pr.commit_count`), and an uncommitted chip when `pr.uncommitted_files` is more than 0:
 
      ```html
      <span class="pr-type-badge type-new">New feature</span>
@@ -343,7 +273,7 @@ flowchart TB
 
      With `+uncommitted`, the last chip says `includes 3 uncommitted files`.
 
-     In since mode, the "real code" and "total" chips count the delta only. Then add one muted chip with the full-PR totals, from step 2: `<span class="chip chip-muted">full PR +281 / -6 · 7 files</span>`.
+     In since mode, the "real code" and "total" chips count the delta only. Then add one muted chip with the full-PR totals, from `totals.full_pr`: `<span class="chip chip-muted">full PR +281 / -6 · 7 files</span>`.
    - `{{SINCE_BANNER}}` — an empty string in normal mode. In since mode:
 
      ```html
@@ -456,14 +386,7 @@ flowchart TB
 
    - `{{REVIEW_PATH}}` — an `<ol class="review-steps">` of the path. Each item has `data-node` set to the node id from the diagram: `<li data-node="AUTH"><span class="step-num">②</span><div><strong>auth</strong><p>Why look here.</p></div></li>`. The page turns the module name into a button that opens that node's files, and adds a `diff ↗` link to its first file on GitHub.
    - `{{DIAGRAM}}` — raw Mermaid only, no fences.
-   - `{{FILES_JSON}}` — one JSON object, no fences. Keys are node ids. Value: `{"label":"auth","files":[{"path":"src/api/auth.py","url":"https://github.com/acme/api/pull/42/files#diff-a8722aff8c58891256e0272e9462a488d473bf4b198d8a76d2f4e2445dde7a00","add":80,"del":0,"status":"risky","generated":false}]}`. `status` is added, modified, deleted, tests, deps, risky, or generated. Use real paths when you have them; if you only have a module label, use that label as `path` and add `"isLabel":true` so it is not linked. Do not invent paths.
-   - `url` per file — GitHub's link to that file's diff: `<PR url>/files#diff-<sha256 of the path>`. Get every hash with one command (use `sha256sum` instead of `shasum -a 256` on Linux):
-
-     ```bash
-     gh pr view <N> --json files --jq '.files[].path' | while IFS= read -r p; do printf '%s %s\n' "$(printf '%s' "$p" | shasum -a 256 | cut -d' ' -f1)" "$p"; done
-     ```
-
-     Copy each hash exactly from the output. Never guess a hash. If you cannot run the command, leave `url` out. The page computes the same hash in the browser and uses it when it can; your `url` is the fallback for browsers that cannot, and the plain `<PR url>/files` page is the last fallback. Auto-generated files get a `url` too.
+   - `{{FILES_JSON}}` — leave this placeholder as it is. Item 4 below fills it from the script's `files_json` (keys are the module ids; each file has `path`, a GitHub diff `url` in PR and since mode, `add`, `del`, `status`, and `generated`). Do not type file lists or hashes yourself. The page also computes each diff link in the browser when it can.
    - `{{PR_DESCRIPTION}}` — PR mode: replace with an empty string. Author mode: a suggested PR title and a Markdown body with four sections: `## What`, `## Why`, `## How to test`, `## Risk notes`. Base it on the commits, the diff, and your risk and conflict findings. If the reason is not clear from commits or code, write `_TODO: add the reason_` under Why. Keep the title short and free of `"`, `` ` ``, `$`, and `\` so the `gh` command in step 11 is safe to paste. In the HTML, escape `&`, `<`, and `>` in the title and body (`&amp;`, `&lt;`, `&gt;`). The Copy buttons already work; do not add script.
 
      ```html
@@ -486,13 +409,20 @@ flowchart TB
      </section>
      ```
 
-   - After writing, run `grep -oE '\{\{[A-Z_]+\}\}' <file>`. It must print nothing. Every placeholder must be replaced: `{{TITLE}}` (twice), `{{PR_URL}}`, `{{META}}`, `{{SINCE_BANNER}}`, `{{BEFORE_AFTER}}`, `{{AFFECTED}}`, `{{SUMMARY}}`, `{{RISK}}`, `{{CONFLICTS}}`, `{{REVIEW_PATH}}`, `{{PR_DESCRIPTION}}`, `{{DIAGRAM}}`, `{{FILES_JSON}}`.
+   - Replace every other placeholder: `{{TITLE}}` (twice), `{{PR_URL}}`, `{{META}}`, `{{SINCE_BANNER}}`, `{{BEFORE_AFTER}}`, `{{AFFECTED}}`, `{{SUMMARY}}`, `{{RISK}}`, `{{CONFLICTS}}`, `{{REVIEW_PATH}}`, `{{PR_DESCRIPTION}}`, `{{DIAGRAM}}`.
 3. Where to write it:
    - **Default (temporary):** write to a hidden folder in the current project: `./.prism/pr-<N>.html` (create the folder). Keep it out of git without touching tracked files: if inside a git repo, append `.prism/` to `$(git rev-parse --git-common-dir)/info/exclude` when it is not already there. Never edit `.gitignore`. It stays inside the project so the editor or Claude app preview can open it.
    - **Save only if asked:** if the input or chat says `save` (for example `/prism 741 save`) or the user asks to keep it, write to `./prism-output/pr-<N>.html` in the current working directory instead.
    - **Author mode:** use `branch-<name>.html` instead of `pr-<N>.html`, in the same folder (`./.prism/`, or `./prism-output/` with `save`). Also write the Markdown body alone (no title line, not HTML-escaped) next to it as `branch-<name>-pr.md`.
    - **Since mode:** name the file `pr-<N>-since-<shortsha>.html` in the same folder, where `<shortsha>` is the first 7 characters of the starting commit. Example: `./.prism/pr-42-since-abc1234.html`. A fallback page shows the full PR, so it uses the normal `pr-<N>.html` name.
-4. Do NOT open the file or a browser yourself. Never run `open`, `xdg-open`, or `start`. Never run `gh pr create` or `git push`. The user decides where to view it and when to open the PR.
+4. Fill the file list, then check that no placeholder is left (the `grep` must print nothing):
+
+   ```bash
+   python3 ~/.claude/skills/prism/prism_collect.py --fill-files <page path> <tmp>
+   grep -oE '\{\{[A-Z_]+\}\}' <page path>
+   ```
+
+5. Do NOT open the file or a browser yourself. Never run `open`, `xdg-open`, or `start`. Never run `gh pr create` or `git push`. The user decides where to view it and when to open the PR.
 
 ## 10. Write the PR comment (only with `comment`)
 

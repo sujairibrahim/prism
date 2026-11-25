@@ -21,19 +21,21 @@ The page includes:
 
 It can also rank every open PR waiting on your review, so you know which one to open first.
 
+Counting lines, muting generated files, grouping modules, checking conflicts, and scoring risk are done by a small script, `prism_collect.py`. So the numbers are the same every run, and big PRs stay fast. Claude reads the code and writes the words.
+
 ![Example PRism page for fake PR #42 Add JWT login](example-page.png)
 
 ## Install
 
-You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in.
+You need the [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in, and Python 3 (standard library only).
 
 For the real conflict check, run `/prism` inside a full (not shallow) local clone of the PR's repo, with git 2.38 or newer. PRism fetches PR heads into private `refs/prism/*` refs, runs `git merge-tree`, and deletes those refs again. It never checks out a branch or touches your working tree. Anywhere else, it falls back to file overlap only and says so on the page.
 
-Copy these two files into your Claude Code skills folder:
+Copy these four files into your Claude Code skills folder:
 
 ```bash
 mkdir -p ~/.claude/skills/prism
-cp SKILL.md template.html ~/.claude/skills/prism/
+cp SKILL.md template.html queue-template.html prism_collect.py ~/.claude/skills/prism/
 ```
 
 ## Usage
@@ -152,7 +154,7 @@ Run these from the root of your repo. `PRISM` is where you have this PRism folde
    ```bash
    PRISM=path/to/prism
    mkdir -p .claude/skills/prism
-   cp "$PRISM/SKILL.md" "$PRISM/template.html" .claude/skills/prism/
+   cp "$PRISM/SKILL.md" "$PRISM/template.html" "$PRISM/queue-template.html" "$PRISM/prism_collect.py" .claude/skills/prism/
    ```
 
    It must be on the default branch: on PR runs the action loads `.claude/` from the base branch, not from the PR.
@@ -172,3 +174,25 @@ Notes:
 - The HTML page is uploaded as a workflow artifact named `prism-pr-<N>`.
 - PRs from forks are skipped by the action by default, so they get no comment.
 - Each run uses your Anthropic API credits.
+
+## The collector script
+
+You can also run the script on its own. It prints one JSON object with the PR details, every file and its flags, the map modules, totals, tests, conflicts, and the risk score with reasons:
+
+```bash
+python3 ~/.claude/skills/prism/prism_collect.py 42
+python3 ~/.claude/skills/prism/prism_collect.py https://github.com/OWNER/REPO/pull/42
+python3 ~/.claude/skills/prism/prism_collect.py 42 --since last
+python3 ~/.claude/skills/prism/prism_collect.py --branch --base develop --uncommitted
+```
+
+Options:
+
+- `--since SHA` or `--since last` — only what changed since a commit, or since your last review.
+- `--branch` — author mode: your current branch against its base. Add `--base NAME` and `--uncommitted` as needed.
+- `--save FILE` — write the full JSON to a file and print a shorter view.
+- `--no-overlaps` — skip the open-PR check. `--no-real-check` — skip `git merge-tree` and use file overlap only.
+- `--max-nodes N` — change the map size (default 10).
+- `--fill-files PAGE FILE` — put the saved file list into a page's `{{FILES_JSON}}`.
+
+If `gh` is missing or not logged in, it prints an error JSON and exits with code 2 or 3.

@@ -2,7 +2,7 @@
 #
 # Setup (see README.md, "Post on every PR with GitHub Actions"):
 #   1. Copy this file to .github/workflows/prism.yml
-#   2. Commit SKILL.md and template.html to .claude/skills/prism/ on your default branch.
+#   2. Commit SKILL.md, template.html, and prism_collect.py to .claude/skills/prism/ on your default branch.
 #      On pull_request runs the action restores .claude/ from the base branch,
 #      so a skill added only in a PR branch is not used.
 #   3. Add the repo secret ANTHROPIC_API_KEY (Settings > Secrets and variables > Actions).
@@ -35,7 +35,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          # Full history, so prism_collect.py can run the real conflict check (git merge-tree).
+          # With a shallow clone it falls back to file overlap only.
+          fetch-depth: 0
 
       - name: Run PRism
         uses: anthropics/claude-code-action@v1
@@ -52,6 +54,7 @@ jobs:
           # `post` tells the skill the repo owner already approved posting, so it does not ask.
           prompt: |
             Read .claude/skills/prism/SKILL.md and follow it exactly.
+            The skill folder is .claude/skills/prism/, so run python3 .claude/skills/prism/prism_collect.py.
             The arguments are: ${{ github.event.pull_request.number }} comment post
             The repo is ${{ github.repository }}. Pass --repo ${{ github.repository }} to gh commands.
             This is a CI run. Nobody will read a chat reply, so keep it to one line with the comment link.
@@ -60,7 +63,7 @@ jobs:
           # other API calls, limited by the permissions block above.
           claude_args: |
             --max-turns 40
-            --allowedTools "Read,Write,Glob,Grep,Bash(gh auth status:*),Bash(gh repo view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(git rev-parse:*),Bash(mkdir:*),Bash(rg:*)"
+            --allowedTools "Read,Write,Glob,Grep,Bash(gh auth status:*),Bash(gh repo view:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(gh api:*),Bash(git rev-parse:*),Bash(git grep:*),Bash(mkdir:*),Bash(rg:*),Bash(grep:*),Bash(python3 .claude/skills/prism/prism_collect.py:*)"
 
       # Optional: keep the full HTML page as a downloadable workflow artifact.
       - name: Upload PRism page

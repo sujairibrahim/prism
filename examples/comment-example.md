@@ -7,21 +7,26 @@
 
 **After:** Users can sign in with a JWT. A users migration stores the new login data, and the user service wires it in.
 
-### 🔥 Risk: 9/10 (High)
+### 🔥 Risk: 7/10 (High)
 
-- Touches auth and a new JWT login path
-- Adds a users migration
-- Updates requirements.txt
-- Overlaps open PR 38 on auth
+- New JWT login flow in auth +3
+- Real conflict with open PR 38 in auth.py +2
+- Adds a users migration +1
+- Updates requirements.txt +1
+- Tests cover the new login −1
 
 ### ⚠️ Conflicts
 
-- Potential conflict with **PR 38 Session refresh** on `src/api/auth.py`. This PR is still mergeable with `main`.
+- ⚠️ Real conflict: **PR 38 Session refresh** in `src/api/auth.py`
+- 🔀 Overlap, merges cleanly: **PR 40 Profile page** also edits `src/services/user.py`
+- ✅ Merges cleanly with `main`
+
+_Checked with git merge-tree against the latest `main` and open PR heads._
 
 ### 🧭 Review path
 
 1. **users migration** — New tables the login flow writes to.
-2. **auth** — JWT login is the new entry point, and it overlaps PR 38.
+2. **auth** — JWT login is the new entry point, and it conflicts with PR 38.
 3. **user service** — Wires login into the existing user logic.
 4. **tests** — Check that the new login path is covered.
 
@@ -36,20 +41,22 @@ flowchart TB
     DB["① 🔥 users migration +40/-0"]
     AUTH["② 🔥 auth +80/-0"]
     USER["③ 🟡 user service +24/-6"]
-    TEST["④ 🧪 test_auth +55/-0"]
+    TESTS["④ 🧪 tests +55/-0"]
     DB ==> AUTH
     AUTH ==> USER
-    USER ==> TEST
+    USER ==> TESTS
   end
 
   DEPS["📦 requirements.txt +2/-0"]
   GEN["🤖 auto-generated 1 file +80/-0"]
   C38["⚠️ PR 38 Session refresh"]
+  O40["🔀 PR 40 Profile page"]
 
   HEAD --> DB
   HEAD --> DEPS
   HEAD --> GEN
   AUTH -.-> C38
+  USER -.- O40
 
   classDef branch fill:#1e293b,stroke:#94a3b8,color:#e2e8f0
   classDef added fill:#14532d,stroke:#22c55e,color:#dcfce7
@@ -60,14 +67,16 @@ flowchart TB
   classDef risky fill:#9a3412,stroke:#f97316,color:#ffedd5
   classDef generated fill:#1f2937,stroke:#64748b,color:#94a3b8,stroke-dasharray:5 5
   classDef conflict fill:#7f1d1d,stroke:#ef4444,color:#fecaca,stroke-dasharray:5 5
+  classDef overlap fill:#1c1917,stroke:#f59e0b,color:#fde68a,stroke-dasharray:3 3
 
   class HEAD,BASE branch
   class DB,AUTH risky
   class USER modified
-  class TEST tests
+  class TESTS tests
   class DEPS deps
   class GEN generated
   class C38 conflict
+  class O40 overlap
 
   linkStyle 1,2,3 stroke:#22d3ee,stroke-width:3px
 ```
@@ -80,7 +89,7 @@ flowchart TB
 | ① users migration | `db/users_migration.sql` | 🔥 risky | +40/-0 |
 | ② auth | `src/api/auth.py` | 🔥 risky | +80/-0 |
 | ③ user service | `src/services/user.py` | 🟡 modified | +24/-6 |
-| ④ test_auth | `tests/test_auth.py` | 🧪 tests | +55/-0 |
+| ④ tests | `tests/test_auth.py` | 🧪 tests | +55/-0 |
 | requirements.txt | `requirements.txt` | 📦 deps | +2/-0 |
 | 🤖 auto-generated | `poetry.lock` | 🤖 generated | +80/-0 |
 
